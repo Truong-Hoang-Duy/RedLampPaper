@@ -1,0 +1,8 @@
+{
+  "name": "040_UCR_EPG_Demo",
+  "description": "Tín hiệu EPG (minh họa Figure 6a: bất thường thay đổi chu kỳ được giải thích bởi cụm Speedup trong không gian tiềm ẩn)",
+  "anomaly_start_in_test": 500,
+  "anomaly_end_in_test": 610,
+  "window_size": 100,
+  "n_features": 1
+}

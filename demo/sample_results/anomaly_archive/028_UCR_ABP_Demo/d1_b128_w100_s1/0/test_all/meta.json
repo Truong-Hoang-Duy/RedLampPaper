@@ -1,0 +1,8 @@
+{
+  "name": "028_UCR_ABP_Demo",
+  "description": "Tín hiệu huyết áp động mạch (minh họa Figure 6b: nhiễu Noise/Spike & hiệu quả lọc lớp giả bình thường Average bằng FAA)",
+  "anomaly_start_in_test": 420,
+  "anomaly_end_in_test": 510,
+  "window_size": 100,
+  "n_features": 1
+}

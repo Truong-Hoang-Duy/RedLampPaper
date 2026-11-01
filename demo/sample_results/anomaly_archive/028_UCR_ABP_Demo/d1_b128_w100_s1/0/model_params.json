@@ -1,0 +1,41 @@
+{
+  "name": "ConvAEC",
+  "n_features": 1,
+  "n_time": 100,
+  "num_filters": [
+    64,
+    64,
+    128,
+    128
+  ],
+  "embedding_dim": 128,
+  "kernel_size": 4,
+  "dropout": 0.2,
+  "normalization": "batch",
+  "stride": 2,
+  "padding": 2,
+  "anomaly_types": [
+    "normal",
+    "spike",
+    "flip",
+    "speedup",
+    "noise",
+    "cutoff",
+    "average",
+    "scale",
+    "wander",
+    "contextual",
+    "upsidedown",
+    "mixture"
+  ],
+  "classes": 12,
+  "classifier_dim": 32,
+  "c_loss_ratio": 0.1,
+  "apply_anomaly_mask": true,
+  "label_smoothing": true,
+  "alpha": 0.1,
+  "beta": 0.01,
+  "lr": 0.002,
+  "epoch": 10,
+  "batch_size": 64
+}
