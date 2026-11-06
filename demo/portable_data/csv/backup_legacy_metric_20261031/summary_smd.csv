@@ -1,0 +1,7 @@
+dataset,setting,metric,ours (mean),std (seeds),paper,diff,#entities,#seeds,status
+SMD,per-entity,VUS-ROC,0.803,0.002,0.813,-0.01,28,5,complete (paper protocol)
+SMD,per-entity,VUS-PR,0.289,0.008,0.366,-0.077,28,5,complete (paper protocol)
+SMD,per-entity,RF,0.306,0.01,0.235,0.071,28,5,complete (paper protocol)
+SMD,per-entity,RF (mean+3std),0.168,0.01,,,28,5,complete (paper protocol)
+SMD,per-entity,R-AUC-ROC,0.842,0.003,0.837,0.005,28,5,complete (paper protocol)
+SMD,per-entity,R-AUC-PR,0.372,0.011,0.429,-0.057,28,5,complete (paper protocol)

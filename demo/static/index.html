@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RedLamp Studio | KDD '25</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #fff1f2 0%, #f8fafc 45%, #eef2ff 100%);
+      color: #0f172a;
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(226, 232, 240, 0.95);
+      box-shadow: 0 6px 20px -4px rgba(15, 23, 42, 0.05);
+    }
+    input[type="range"] {
+      height: 6px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+  </style>
+</head>
+<body class="antialiased selection:bg-rose-500 selection:text-white">
+
+  <!-- ==================== TOP BAR ==================== -->
+  <header class="sticky top-0 z-30 glass-card border-b border-slate-200/90 px-6 py-3.5">
+    <div class="max-w-[1560px] mx-auto flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Brand -->
+      <div class="flex items-center gap-3">
+        <div class="w-2.5 h-8 rounded-full bg-gradient-to-b from-rose-500 via-orange-500 to-indigo-600"></div>
+        <h1 class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 via-rose-600 to-indigo-600 bg-clip-text text-transparent">
+          RedLamp Studio
+        </h1>
+        <span class="px-2.5 py-0.5 text-xs font-bold rounded-full bg-rose-100 text-rose-700 border border-rose-200">
+          KDD '25
+        </span>
+      </div>
+
+      <!-- Selectors: Domain -> Entity -> Seed -->
+      <div class="flex flex-wrap items-center gap-2.5 bg-slate-100/90 p-1.5 rounded-xl border border-slate-200/90">
+        <div class="flex items-center gap-1.5 pl-2">
+          <span class="text-xs font-bold text-slate-500">Miền:</span>
+          <select id="sel-dataset" onchange="onDatasetChange()" class="bg-white text-slate-900 text-sm font-bold px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-500">
+          </select>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+          <span class="text-xs font-bold text-slate-500">Thực thể:</span>
+          <select id="sel-entity" onchange="onEntityChange()" class="bg-white text-slate-900 text-sm font-bold px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm max-w-[310px] focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </select>
+        </div>
+
+        <div class="flex items-center gap-1 pr-1" id="seed-pills"></div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs + Real-time Sliders -->
+    <div class="max-w-[1560px] mx-auto mt-3 pt-3 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+        <button onclick="switchTab('monitor')" id="tab-btn-monitor" class="px-4 py-1.5 rounded-lg text-sm font-bold transition-all bg-gradient-to-r from-rose-500 to-orange-500 text-white shadow-sm">
+          1. Giám sát &amp; FAA
+        </button>
+        <button onclick="switchTab('bench')" id="tab-btn-bench" class="px-4 py-1.5 rounded-lg text-sm font-bold transition-all text-slate-600 hover:text-slate-900">
+          2. Kết quả KDD '25
+        </button>
+        <button onclick="switchTab('tsne')" id="tab-btn-tsne" class="px-4 py-1.5 rounded-lg text-sm font-bold transition-all text-slate-600 hover:text-slate-900">
+          3. Không gian Tiềm ẩn
+        </button>
+        <button onclick="switchTab('live')" id="tab-btn-live" class="px-4 py-1.5 rounded-lg text-sm font-bold transition-all text-slate-600 hover:text-slate-900">
+          4. Giả lập Bơm Lỗi
+        </button>
+        <button onclick="switchTab('aug')" id="tab-btn-aug" class="px-4 py-1.5 rounded-lg text-sm font-bold transition-all text-slate-600 hover:text-slate-900">
+          5. 12 Biến Đổi &amp; Nhãn Mềm
+        </button>
+      </div>
+
+      <!-- Sliders -->
+      <div class="flex flex-wrap items-center gap-2.5 text-xs">
+        <div class="flex items-center gap-2 bg-rose-50/90 border border-rose-200 px-3 py-1.5 rounded-xl text-rose-900 font-semibold">
+          <span>FAA δ:</span>
+          <input id="ctrl-faa" type="range" min="0.01" max="0.30" step="0.01" value="0.05" oninput="onRealtimeParamChange()" class="w-24 accent-rose-500" />
+          <span id="lbl-faa" class="font-mono font-bold text-rose-600 text-sm">0.05</span>
+        </div>
+        <div class="flex items-center gap-2 bg-indigo-50/90 border border-indigo-200 px-3 py-1.5 rounded-xl text-indigo-900 font-semibold">
+          <span>Trọng số MSE:</span>
+          <input id="ctrl-weight" type="range" min="0.00" max="1.00" step="0.05" value="0.50" oninput="onRealtimeParamChange()" class="w-20 accent-indigo-600" />
+          <span id="lbl-weight" class="font-mono font-bold text-indigo-600 text-sm">0.50</span>
+        </div>
+        <div class="flex items-center gap-2 bg-emerald-50/90 border border-emerald-200 px-3 py-1.5 rounded-xl text-emerald-900 font-semibold">
+          <span>Làm mượt w:</span>
+          <input id="ctrl-smooth" type="range" min="1" max="100" step="2" value="50" oninput="onRealtimeParamChange()" class="w-20 accent-emerald-600" />
+          <span id="lbl-smooth" class="font-mono font-bold text-emerald-600 text-sm">50</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== MAIN WORKSPACE ==================== -->
+  <main class="max-w-[1560px] mx-auto px-6 py-5 space-y-5">
+
+    <!-- KPI Strip -->
+    <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div class="glass-card rounded-2xl p-4 bg-gradient-to-br from-white to-rose-50/60 border-l-4 border-l-rose-500">
+        <div class="text-xs font-bold text-rose-600 uppercase">Thực thể</div>
+        <div id="card-entity" class="text-base font-extrabold text-slate-900 mt-1 truncate">Đang tải...</div>
+        <div id="card-meta" class="text-xs text-slate-500 mt-0.5">—</div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-4 bg-gradient-to-br from-white to-indigo-50/60 border-l-4 border-l-indigo-500">
+        <div class="text-xs font-bold text-indigo-600 uppercase">VUS-ROC / R-AUC-ROC</div>
+        <div id="card-roc" class="text-lg font-extrabold text-slate-900 mt-1 font-mono">—</div>
+        <div class="text-xs text-emerald-600 font-semibold mt-0.5">Chuẩn KDD '25</div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-4 bg-gradient-to-br from-white to-sky-50/60 border-l-4 border-l-sky-500">
+        <div class="text-xs font-bold text-sky-600 uppercase">R-AUC-PR / RF (Oracle)</div>
+        <div id="card-pr" class="text-lg font-extrabold text-slate-900 mt-1 font-mono">—</div>
+        <div class="text-xs text-sky-600 font-semibold mt-0.5">Độ chính xác PR &amp; F1</div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-4 bg-gradient-to-br from-white to-emerald-50/60 border-l-4 border-l-emerald-500">
+        <div class="text-xs font-bold text-emerald-600 uppercase">Hình thái Đỉnh</div>
+        <div id="card-dom-cls" class="text-base font-extrabold text-emerald-700 mt-1">—</div>
+        <div id="card-dom-desc" class="text-xs text-slate-500 mt-0.5 truncate">—</div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-4 bg-gradient-to-br from-white to-amber-50/60 border-l-4 border-l-amber-500">
+        <div class="text-xs font-bold text-amber-600 uppercase">Lớp FAA Lọc</div>
+        <div id="card-faa-sup" class="text-base font-extrabold text-amber-700 mt-1">—</div>
+        <div class="text-xs text-slate-500 mt-0.5">Lọc lớp giả bình thường</div>
+      </div>
+    </section>
+
+    <!-- ==================== SCREEN 1: TELEMETRY & FAA ==================== -->
+    <section id="screen-monitor" class="space-y-5">
+      <div class="glass-card rounded-2xl p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-200/80">
+          <div class="flex items-center gap-3">
+            <span class="px-3 py-1 rounded-lg bg-sky-100 text-sky-800 font-bold text-xs">Đồng bộ 3 Tầng</span>
+            <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <span>Kênh:</span>
+              <select id="sel-channel" onchange="onChannelChange()" class="bg-slate-100 border border-slate-300 text-slate-900 px-3 py-1 rounded-lg font-bold text-sm"></select>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2.5 text-xs font-semibold">
+            <span class="text-slate-600">Khung nhìn:</span>
+            <input id="zoom-start" type="range" min="0" max="90" value="0" oninput="onZoomSliderChange()" class="w-28 accent-sky-500" />
+            <span>→</span>
+            <input id="zoom-end" type="range" min="10" max="100" value="100" oninput="onZoomSliderChange()" class="w-28 accent-sky-500" />
+            <button onclick="focusAnomalyPeak()" class="px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold transition">
+              Zoom vùng đỉnh
+            </button>
+            <button onclick="resetZoom()" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition">
+              Toàn chuỗi
+            </button>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <div class="flex items-center justify-between text-sm font-bold text-slate-800 mb-1.5 px-1">
+              <span>1. Tín hiệu đầu vào X(t)</span>
+              <span id="zoom-label" class="font-mono text-xs text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-md border border-sky-200"></span>
+            </div>
+            <canvas id="canvas-tier1" class="w-full h-[150px] rounded-xl bg-slate-50/80 border border-slate-200"></canvas>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between text-sm font-bold text-slate-800 mb-1.5 px-1">
+              <span>2. Điểm thành phần: s_MSE(t) vs. s_CE(t)</span>
+              <div class="flex items-center gap-4 text-xs">
+                <span class="inline-flex items-center gap-1.5 text-sky-600"><span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span> s_MSE (Autoencoder)</span>
+                <span class="inline-flex items-center gap-1.5 text-purple-600"><span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span> s_CE (Classifier + FAA)</span>
+              </div>
+            </div>
+            <canvas id="canvas-tier2" class="w-full h-[140px] rounded-xl bg-slate-50/80 border border-slate-200"></canvas>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between text-sm font-bold text-slate-800 mb-1.5 px-1">
+              <span>3. Điểm tổng hợp s(t): Có FAA vs. Tắt FAA</span>
+              <div class="flex items-center gap-4 text-xs">
+                <span class="inline-flex items-center gap-1.5 text-slate-500"><span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span> Tắt FAA</span>
+                <span class="inline-flex items-center gap-1.5 text-rose-600"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Có FAA</span>
+              </div>
+            </div>
+            <canvas id="canvas-tier3" class="w-full h-[150px] rounded-xl bg-slate-50/80 border border-slate-200"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div class="lg:col-span-5 glass-card rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-extrabold text-slate-800">Tần suất 11 Lớp &amp; Ngưỡng FAA δ</h3>
+            <span class="text-xs font-semibold text-rose-600">Vượt ngưỡng ⇒ Lọc bỏ</span>
+          </div>
+          <canvas id="canvas-faa-bars" class="w-full h-[220px]"></canvas>
+        </div>
+
+        <div class="lg:col-span-7 glass-card rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-extrabold text-slate-800">Xác suất 11 Lớp theo Thời gian</h3>
+          </div>
+          <canvas id="canvas-prob-lines" class="w-full h-[220px] rounded-xl bg-slate-50/70 border border-slate-200"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SCREEN 2: BENCHMARK LEADERBOARD ==================== -->
+    <section id="screen-bench" class="space-y-5 hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div class="lg:col-span-7 glass-card rounded-2xl p-5">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 class="text-base font-extrabold text-slate-900">Đối sánh Kết quả (Ours 5 Seeds vs. KDD '25)</h3>
+              <p class="text-xs text-slate-500">So sánh bản chuẩn (04/11), bài báo gốc và bản Legacy (31/10)</p>
+            </div>
+            <div class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+              <button onclick="renderBenchmarkCard('aiops')" id="bcard-aiops" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-500 text-white">AIOps</button>
+              <button onclick="renderBenchmarkCard('smd')" id="bcard-smd" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600">SMD</button>
+              <button onclick="renderBenchmarkCard('msl')" id="bcard-msl" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600">MSL</button>
+              <button onclick="renderBenchmarkCard('smap')" id="bcard-smap" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600">SMAP</button>
+            </div>
+          </div>
+          <div id="bench-bars-container" class="space-y-3"></div>
+        </div>
+
+        <div class="lg:col-span-5 glass-card rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="text-base font-extrabold text-slate-900">Hội tụ Huấn luyện (Epoch Loss)</h3>
+              <p class="text-xs text-slate-500">L_MSE &amp; L_CE theo Epoch</p>
+            </div>
+            <div class="flex items-center gap-3 text-xs font-bold">
+              <span class="text-emerald-600">Train MSE</span>
+              <span class="text-sky-600">Valid MSE</span>
+              <span class="text-purple-600">Train CE</span>
+            </div>
+          </div>
+          <canvas id="canvas-loss" class="w-full h-[280px] rounded-xl bg-slate-50/80 border border-slate-200"></canvas>
+        </div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <h3 class="text-base font-extrabold text-slate-900">Bảng Xếp Hạng Thực Thể (Trung bình 5 Seeds)</h3>
+          <input id="inp-search-ent" type="text" oninput="filterLeaderboard()" placeholder="Tìm thực thể / kênh..." class="px-3.5 py-1.5 rounded-xl border border-slate-300 text-sm font-semibold w-64 focus:outline-none focus:ring-2 focus:ring-rose-500" />
+        </div>
+        <div class="overflow-x-auto max-h-[340px] overflow-y-auto rounded-xl border border-slate-200">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead class="bg-slate-100 text-slate-700 sticky top-0 font-bold text-xs uppercase">
+              <tr>
+                <th class="py-2.5 px-3.5">#</th>
+                <th class="py-2.5 px-3.5">Thực thể</th>
+                <th class="py-2.5 px-3.5">VUS-ROC</th>
+                <th class="py-2.5 px-3.5">R-AUC-ROC</th>
+                <th class="py-2.5 px-3.5">R-AUC-PR</th>
+                <th class="py-2.5 px-3.5">VUS-PR</th>
+                <th class="py-2.5 px-3.5">RF</th>
+                <th class="py-2.5 px-3.5">RF (Oracle)</th>
+                <th class="py-2.5 px-3.5 text-right">Chọn</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-tbody" class="divide-y divide-slate-200/80 font-medium"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SCREEN 3: 128D LATENT SPACE ==================== -->
+    <section id="screen-tsne" class="space-y-5 hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div class="lg:col-span-7 glass-card rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="text-base font-extrabold text-slate-900">Không gian Tiềm ẩn 2D (`enc.npy` — 128D)</h3>
+              <p class="text-xs text-slate-500">Các điểm đỉnh bất thường (dấu X đỏ) tụ về cụm lớp có cùng hình thái</p>
+            </div>
+            <span class="px-3 py-1 rounded-lg bg-rose-100 text-rose-700 font-bold text-xs">X Đỏ: Đỉnh Dị Thường</span>
+          </div>
+          <canvas id="canvas-tsne" class="w-full h-[360px] rounded-xl bg-slate-50/80 border border-slate-200"></canvas>
+        </div>
+
+        <div class="lg:col-span-5 glass-card rounded-2xl p-5 flex flex-col justify-between">
+          <div>
+            <h3 class="text-base font-extrabold text-slate-900">Tỷ lệ Hình thái tại Vùng Đỉnh</h3>
+            <p class="text-xs text-slate-500 mb-3">Phân bố xác suất của Classifier tại vùng bất thường</p>
+            <div id="signature-bars" class="space-y-2.5"></div>
+          </div>
+          <div id="xai-conclusion-box" class="mt-4 p-3.5 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 text-xs text-emerald-900">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SCREEN 4: LIVE INJECTION ==================== -->
+    <section id="screen-live" class="space-y-5 hidden">
+      <div class="glass-card rounded-2xl p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200">
+          <div>
+            <h3 class="text-base font-extrabold text-slate-900">Giả lập Bơm Sự cố Thời gian thực (`bestmodel.pkl`)</h3>
+            <p class="text-xs text-slate-500">Chọn kiểu biến đổi để tiêm vào cửa sổ thực tế và chạy suy luận PyTorch</p>
+          </div>
+          <div class="flex items-center gap-3 text-xs font-bold">
+            <label class="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+              <span>Vị trí:</span>
+              <input id="live-win-slider" type="range" min="0" max="500" value="50" onchange="triggerLiveInject()" class="w-28 accent-rose-500" />
+            </label>
+            <label class="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+              <span>Seed:</span>
+              <input id="live-seed-slider" type="range" min="1" max="99" value="12" onchange="triggerLiveInject()" class="w-20 accent-indigo-600" />
+            </label>
+          </div>
+        </div>
+
+        <div id="live-aug-pills" class="flex flex-wrap items-center gap-2 my-3.5"></div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-3.5">
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="text-xs font-bold text-slate-500">MSE Gốc</div>
+            <div id="live-mse-before" class="text-xl font-extrabold font-mono text-slate-800 mt-0.5">—</div>
+          </div>
+          <div class="p-3.5 rounded-xl bg-rose-50 border border-rose-200">
+            <div class="text-xs font-bold text-rose-600">MSE Sau Tiêm</div>
+            <div id="live-mse-after" class="text-xl font-extrabold font-mono text-rose-600 mt-0.5">—</div>
+          </div>
+          <div class="p-3.5 rounded-xl bg-indigo-50 border border-indigo-200">
+            <div class="text-xs font-bold text-indigo-600">Dự đoán Classifier</div>
+            <div id="live-pred-cls" class="text-xl font-extrabold text-indigo-700 mt-0.5">—</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 mt-3.5">
+          <div class="lg:col-span-7">
+            <div class="flex items-center justify-between text-sm font-bold text-slate-700 mb-1.5">
+              <span>Tín hiệu Gốc Z(t), Sau tiêm Y(t) &amp; Tái tạo X̂(t)</span>
+              <div class="flex items-center gap-3 text-xs">
+                <span class="text-slate-500">--- Gốc</span>
+                <span class="text-rose-600">━━ Sau tiêm</span>
+                <span class="text-sky-600">━━ Tái tạo</span>
+              </div>
+            </div>
+            <canvas id="canvas-live-wave" class="w-full h-[260px] rounded-xl bg-slate-50/80 border border-slate-200"></canvas>
+          </div>
+          <div class="lg:col-span-5">
+            <div class="text-sm font-bold text-slate-700 mb-1.5">Xác suất 12 Lớp: Trước (Xám) &amp; Sau tiêm (Màu)</div>
+            <canvas id="canvas-live-probs" class="w-full h-[260px] rounded-xl bg-slate-50/80 border border-slate-200"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SCREEN 5: 12 AUGMENTATIONS & SOFT LABELS ==================== -->
+    <section id="screen-aug" class="space-y-5 hidden">
+      <div class="glass-card rounded-2xl p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 class="text-base font-extrabold text-slate-900">12 Phép Biến Đổi (Figure 2a) &amp; Nhãn Mềm (Eq. 1)</h3>
+            <p class="text-xs text-slate-500">Vùng tô hồng là mặt nạ <code class="font-bold text-rose-600">anomaly_mask (W=0)</code></p>
+          </div>
+          <div class="flex items-center gap-3 text-xs font-bold">
+            <label class="flex items-center gap-2 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200 text-rose-800">
+              <span>Hệ số α:</span>
+              <input id="soft-alpha" type="range" min="0.00" max="0.30" step="0.01" value="0.10" oninput="renderSoftLabels()" class="w-24 accent-rose-500" />
+              <span id="lbl-alpha" class="font-mono text-sm">0.10</span>
+            </label>
+            <label class="flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-200 text-indigo-800">
+              <span>Hệ số β:</span>
+              <input id="soft-beta" type="range" min="0.000" max="0.040" step="0.002" value="0.010" oninput="renderSoftLabels()" class="w-24 accent-indigo-600" />
+              <span id="lbl-beta" class="font-mono text-sm">0.010</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="mb-4 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+          <div class="text-xs font-bold text-slate-700 mb-2">Phân bố Nhãn Mềm ỹ (Lớp đang chọn: <span id="soft-focus-name" class="text-rose-600 uppercase">SPIKE</span>):</div>
+          <div id="soft-label-bars" class="grid grid-cols-6 md:grid-cols-12 gap-2"></div>
+        </div>
+
+        <div id="grid-12-container" class="grid grid-cols-2 md:grid-cols-4 gap-3.5"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    const CLASS_COLORS = {
+      normal: '#10b981', spike: '#f43f5e', flip: '#f97316', speedup: '#eab308',
+      noise: '#14b8a6', cutoff: '#8b5cf6', average: '#3b82f6', scale: '#ec4899',
+      wander: '#06b6d4', contextual: '#6366f1', upsidedown: '#e11d48', mixture: '#a855f7'
+    };
+
+    const CLASS_DESC_VI = {
+      normal: 'Chuỗi gốc bình thường',
+      spike: 'Gai nhọn đột biến (Point Outlier)',
+      flip: 'Đảo ngược chiều thời gian',
+      speedup: 'Co/giãn tần số (2x, 0.5x)',
+      noise: 'Nhiễu trắng Gaussian',
+      cutoff: 'Kẹt tín hiệu về hằng số',
+      average: 'Làm trơn trung bình trượt',
+      scale: 'Thay đổi biên độ',
+      wander: 'Trôi đường cơ sở tuyến tính',
+      contextual: 'Co giãn biên độ + Dịch nền',
+      upsidedown: 'Đảo cực qua trung bình',
+      mixture: 'Tráo đoạn tín hiệu khác'
+    };
+
+    let STATE = {
+      initData: null,
+      currentDataset: 'aiops',
+      currentEntity: '',
+      currentSeed: 0,
+      currentChannel: 0,
+      currentTab: 'monitor',
+      runData: null,
+      liveData: null,
+      liveAugType: 'spike',
+      benchDataset: 'aiops'
+    };
+
+    async function initApp() {
+      const res = await fetch('/api/init');
+      STATE.initData = await res.json();
+
+      const selDs = document.getElementById('sel-dataset');
+      const dsKeys = Object.keys(STATE.initData.datasets);
+      selDs.innerHTML = dsKeys.map(k => {
+        const d = STATE.initData.datasets[k];
+        return `<option value="${k}">${d.title}</option>`;
+      }).join('');
+
+      STATE.currentDataset = dsKeys[0];
+      populateEntities(STATE.currentDataset);
+      buildLiveAugPills();
+      renderBenchmarkCard('aiops');
+      await loadRunData();
+      await triggerLiveInject();
+    }
+
+    function populateEntities(dsKey) {
+      const dsInfo = STATE.initData.datasets[dsKey];
+      const selEnt = document.getElementById('sel-entity');
+      selEnt.innerHTML = dsInfo.entities.map(e => {
+        const badge = e.vus_roc !== null && e.vus_roc !== undefined
+          ? ` (${e.vus_roc.toFixed(3)})`
+          : '';
+        return `<option value="${e.name}">${e.name}${badge}</option>`;
+      }).join('');
+      STATE.currentEntity = dsInfo.default_entity;
+      selEnt.value = STATE.currentEntity;
+      populateSeeds();
+    }
+
+    function populateSeeds() {
+      const dsInfo = STATE.initData.datasets[STATE.currentDataset];
+      const entObj = dsInfo.entities.find(e => e.name === STATE.currentEntity) || dsInfo.entities[0];
+      const seeds = entObj ? entObj.seeds : [0];
+      if (!seeds.includes(STATE.currentSeed)) STATE.currentSeed = seeds[0];
+
+      const wrap = document.getElementById('seed-pills');
+      wrap.innerHTML = seeds.map(s => `
+        <button onclick="selectSeed(${s})" class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition ${
+          s === STATE.currentSeed
+            ? 'bg-indigo-600 text-white shadow-sm'
+            : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200'
+        }">S${s}</button>
+      `).join('');
+    }
+
+    async function onDatasetChange() {
+      STATE.currentDataset = document.getElementById('sel-dataset').value;
+      STATE.currentChannel = 0;
+      populateEntities(STATE.currentDataset);
+      if (['aiops', 'smd', 'msl', 'smap'].includes(STATE.currentDataset)) {
+        renderBenchmarkCard(STATE.currentDataset);
+      }
+      await loadRunData();
+      await triggerLiveInject();
+    }
+
+    async function onEntityChange() {
+      STATE.currentEntity = document.getElementById('sel-entity').value;
+      STATE.currentChannel = 0;
+      populateSeeds();
+      await loadRunData();
+      await triggerLiveInject();
+    }
+
+    async function selectSeed(s) {
+      STATE.currentSeed = s;
+      populateSeeds();
+      await loadRunData();
+      await triggerLiveInject();
+    }
+
+    async function onChannelChange() {
+      STATE.currentChannel = parseInt(document.getElementById('sel-channel').value || '0', 10);
+      await loadRunData();
+      await triggerLiveInject();
+    }
+
+    function switchTab(tab) {
+      STATE.currentTab = tab;
+      ['monitor', 'bench', 'tsne', 'live', 'aug'].forEach(t => {
+        document.getElementById('screen-' + t).classList.toggle('hidden', t !== tab);
+        const btn = document.getElementById('tab-btn-' + t);
+        btn.className = t === tab
+          ? "px-4 py-1.5 rounded-lg text-sm font-bold transition-all bg-gradient-to-r from-rose-500 to-orange-500 text-white shadow-sm"
+          : "px-4 py-1.5 rounded-lg text-sm font-bold transition-all text-slate-600 hover:text-slate-900";
+      });
+      requestAnimationFrame(() => {
+        renderAllActiveCharts();
+      });
+    }
+
+    async function loadRunData() {
+      const url = `/api/run?dataset=${encodeURIComponent(STATE.currentDataset)}&entity=${encodeURIComponent(STATE.currentEntity)}&seed=${STATE.currentSeed}&channel=${STATE.currentChannel}&max_points=2400`;
+      const res = await fetch(url);
+      STATE.runData = await res.json();
+
+      const selCh = document.getElementById('sel-channel');
+      const D = STATE.runData.n_features;
+      selCh.innerHTML = Array.from({ length: D }, (_, i) =>
+        `<option value="${i}" ${i === STATE.runData.channel ? 'selected' : ''}>#${i + 1}</option>`
+      ).join('');
+
+      document.getElementById('live-win-slider').max = Math.max(10, STATE.runData.n_timesteps - 105);
+      resetZoom(false);
+      updateHeaderCards();
+      renderAllActiveCharts();
+    }
+
+    function convolveMinMax(arr, w) {
+      const N = arr.length;
+      if (N === 0) return [];
+      const win = Math.max(1, Math.floor(w));
+      const sm = new Float64Array(N);
+      if (win <= 1) {
+        for (let i = 0; i < N; i++) sm[i] = arr[i];
+      } else {
+        let sum = 0;
+        for (let i = 0; i < N; i++) {
+          sum += arr[i];
+          if (i >= win) sum -= arr[i - win];
+          sm[i] = sum / Math.min(i + 1, win);
+        }
+      }
+      let mn = Infinity, mx = -Infinity;
+      for (let i = 0; i < N; i++) {
+        if (sm[i] < mn) mn = sm[i];
+        if (sm[i] > mx) mx = sm[i];
+      }
+      const denom = (mx - mn) + 1e-12;
+      const out = new Float64Array(N);
+      for (let i = 0; i < N; i++) out[i] = (sm[i] - mn) / denom;
+      return out;
+    }
+
+    function computeClientScores() {
+      const d = STATE.runData;
+      if (!d) return null;
+      const faaDelta = parseFloat(document.getElementById('ctrl-faa').value);
+      const mseWeight = parseFloat(document.getElementById('ctrl-weight').value);
+      const smoothW = Math.max(1, Math.round(parseInt(document.getElementById('ctrl-smooth').value, 10) / d.stride));
+
+      const N = d.raw_mse.length;
+      const meanProbs = d.mean_class_probs;
+      const suppressed = new Set([0]);
+      const suppressedNames = [];
+      const types = STATE.initData.anomaly_types;
+
+      for (let c = 1; c < meanProbs.length; c++) {
+        if (meanProbs[c] > faaDelta) {
+          suppressed.add(c);
+          suppressedNames.push(types[c].toUpperCase());
+        }
+      }
+
+      const rawCe = new Float64Array(N);
+      const faaCe = new Float64Array(N);
+      for (let i = 0; i < N; i++) {
+        const row = d.pred_label[i];
+        let sRaw = 0, sFaa = 0;
+        for (let c = 1; c < 12; c++) {
+          sRaw += row[c];
+          if (!suppressed.has(c)) sFaa += row[c];
+        }
+        rawCe[i] = sRaw;
+        faaCe[i] = sFaa;
+      }
+
+      const normMse = convolveMinMax(d.raw_mse, smoothW);
+      const normRawCe = convolveMinMax(rawCe, smoothW);
+      const normFaaCe = convolveMinMax(faaCe, smoothW);
+
+      const totalScore = new Float64Array(N);
+      const totalNoFaa = new Float64Array(N);
+      for (let i = 0; i < N; i++) {
+        totalScore[i] = mseWeight * normMse[i] + (1 - mseWeight) * normFaaCe[i];
+        totalNoFaa[i] = mseWeight * normMse[i] + (1 - mseWeight) * normRawCe[i];
+      }
+
+      return { normMse, normFaaCe, totalScore, totalNoFaa, suppressed, suppressedNames, faaDelta };
+    }
+
+    function onRealtimeParamChange() {
+      document.getElementById('lbl-faa').textContent = parseFloat(document.getElementById('ctrl-faa').value).toFixed(2);
+      document.getElementById('lbl-weight').textContent = parseFloat(document.getElementById('ctrl-weight').value).toFixed(2);
+      document.getElementById('lbl-smooth').textContent = document.getElementById('ctrl-smooth').value;
+      updateHeaderCards();
+      renderAllActiveCharts();
+    }
+
+    function updateHeaderCards() {
+      const d = STATE.runData;
+      if (!d) return;
+      const sc = computeClientScores();
+      const types = STATE.initData.anomaly_types;
+      const totalD = d.total_features || d.n_features;
+
+      document.getElementById('card-entity').textContent = `${d.entity} (S${d.seed})`;
+      document.getElementById('card-meta').textContent = `${d.n_timesteps.toLocaleString()} bước • D=${totalD}`;
+
+      if (d.metrics && d.metrics.vus_roc !== null) {
+        document.getElementById('card-roc').textContent = `${d.metrics.vus_roc.toFixed(3)} / ${d.metrics.rauc_roc.toFixed(3)}`;
+        document.getElementById('card-pr').textContent = `${d.metrics.rauc_pr.toFixed(3)} / ${(d.metrics.rf_oracle || d.metrics.rf || 0).toFixed(3)}`;
+      } else {
+        document.getElementById('card-roc').textContent = "UCR Sample";
+        document.getElementById('card-pr').textContent = "Figure 6";
+      }
+
+      let bestIdx = 0;
+      for (let c = 1; c < d.peak_signature.length; c++) {
+        if (d.peak_signature[c] > d.peak_signature[bestIdx]) bestIdx = c;
+      }
+      const domName = types[bestIdx + 1];
+      const domEl = document.getElementById('card-dom-cls');
+      domEl.textContent = `${domName.toUpperCase()} (${(d.peak_signature[bestIdx] * 100).toFixed(1)}%)`;
+      domEl.style.color = CLASS_COLORS[domName];
+      document.getElementById('card-dom-desc').textContent = CLASS_DESC_VI[domName];
+
+      document.getElementById('card-faa-sup').textContent = sc.suppressedNames.length > 0
+        ? sc.suppressedNames.join(', ')
+        : 'Không có';
+    }
+
+    function setupCanvas(id) {
+      const canvas = document.getElementById(id);
+      if (!canvas) return null;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return null;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      return { ctx, W: rect.width, H: rect.height };
+    }
+
+    function drawSeriesLine(ctx, arr, iStart, iEnd, W, H, padT, padB, color, width, dashed = false, fixedRange = null) {
+      const len = iEnd - iStart;
+      if (len <= 1) return;
+      let mn = Infinity, mx = -Infinity;
+      if (fixedRange) {
+        mn = fixedRange[0]; mx = fixedRange[1];
+      } else {
+        for (let i = iStart; i < iEnd; i++) {
+          if (arr[i] < mn) mn = arr[i];
+          if (arr[i] > mx) mx = arr[i];
+        }
+      }
+      const denom = (mx - mn) || 1;
+      const plotH = H - padT - padB;
+
+      ctx.beginPath();
+      if (dashed) ctx.setLineDash([5, 4]);
+      else ctx.setLineDash([]);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+
+      for (let i = iStart; i < iEnd; i++) {
+        const x = ((i - iStart) / (len - 1)) * W;
+        const y = padT + plotH - ((arr[i] - mn) / denom) * plotH;
+        if (i === iStart) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function drawGtZones(ctx, d, iStart, iEnd, W, H) {
+      if (!d.gt_intervals || d.gt_intervals.length === 0) return;
+      const tStart = d.timesteps[iStart];
+      const tEnd = d.timesteps[Math.min(d.timesteps.length - 1, iEnd - 1)];
+      const span = Math.max(1, tEnd - tStart);
+
+      ctx.fillStyle = "rgba(244, 63, 94, 0.16)";
+      d.gt_intervals.forEach(([s, e]) => {
+        if (e >= tStart && s <= tEnd) {
+          const x0 = Math.max(0, ((s - tStart) / span) * W);
+          const x1 = Math.min(W, ((e - tStart) / span) * W);
+          ctx.fillRect(x0, 0, Math.max(4, x1 - x0), H);
+        }
+      });
+    }
+
+    function renderMonitorCharts() {
+      const d = STATE.runData;
+      if (!d) return;
+      const sc = computeClientScores();
+      const N = d.input_series.length;
+
+      const z0 = parseInt(document.getElementById('zoom-start').value, 10);
+      const z1 = parseInt(document.getElementById('zoom-end').value, 10);
+      const iStart = Math.floor((Math.min(z0, z1 - 2) / 100) * N);
+      const iEnd = Math.max(iStart + 10, Math.floor((Math.max(z1, z0 + 2) / 100) * N));
+
+      document.getElementById('zoom-label').textContent =
+        `${d.timesteps[iStart].toLocaleString()} → ${d.timesteps[Math.min(N - 1, iEnd - 1)].toLocaleString()}`;
+
+      const c1 = setupCanvas('canvas-tier1');
+      if (c1) {
+        c1.ctx.clearRect(0, 0, c1.W, c1.H);
+        drawGtZones(c1.ctx, d, iStart, iEnd, c1.W, c1.H);
+        drawSeriesLine(c1.ctx, d.input_series, iStart, iEnd, c1.W, c1.H, 12, 12, '#0284c7', 1.9);
+        if (d.pred_series) {
+          drawSeriesLine(c1.ctx, d.pred_series, iStart, iEnd, c1.W, c1.H, 12, 12, '#f97316', 1.6, true);
+        }
+      }
+
+      const c2 = setupCanvas('canvas-tier2');
+      if (c2) {
+        c2.ctx.clearRect(0, 0, c2.W, c2.H);
+        drawGtZones(c2.ctx, d, iStart, iEnd, c2.W, c2.H);
+        drawSeriesLine(c2.ctx, sc.normMse, iStart, iEnd, c2.W, c2.H, 12, 12, '#0ea5e9', 1.8, false, [0, 1.05]);
+        drawSeriesLine(c2.ctx, sc.normFaaCe, iStart, iEnd, c2.W, c2.H, 12, 12, '#9333ea', 1.8, false, [0, 1.05]);
+      }
+
+      const c3 = setupCanvas('canvas-tier3');
+      if (c3) {
+        c3.ctx.clearRect(0, 0, c3.W, c3.H);
+        drawGtZones(c3.ctx, d, iStart, iEnd, c3.W, c3.H);
+        drawSeriesLine(c3.ctx, sc.totalNoFaa, iStart, iEnd, c3.W, c3.H, 12, 12, '#94a3b8', 1.5, true, [0, 1.05]);
+        drawSeriesLine(c3.ctx, sc.totalScore, iStart, iEnd, c3.W, c3.H, 12, 12, '#f43f5e', 2.4, false, [0, 1.05]);
+      }
+
+      const cBar = setupCanvas('canvas-faa-bars');
+      if (cBar) {
+        const { ctx, W, H } = cBar;
+        ctx.clearRect(0, 0, W, H);
+        const types = STATE.initData.anomaly_types.slice(1);
+        const probs = d.mean_class_probs.slice(1);
+        const maxVal = Math.max(0.28, ...probs, sc.faaDelta * 1.25);
+        const padL = 28, padR = 12, padT = 20, padB = 34;
+        const plotW = W - padL - padR, plotH = H - padT - padB;
+        const barW = (plotW / types.length) * 0.62;
+
+        types.forEach((t, idx) => {
+          const p = probs[idx];
+          const x = padL + idx * (plotW / types.length) + (plotW / types.length - barW) / 2;
+          const h = (p / maxVal) * plotH;
+          const y = padT + plotH - h;
+          const isSup = p > sc.faaDelta;
+
+          ctx.fillStyle = isSup ? '#cbd5e1' : CLASS_COLORS[t];
+          ctx.beginPath();
+          ctx.roundRect(x, y, barW, Math.max(3, h), 5);
+          ctx.fill();
+
+          ctx.fillStyle = isSup ? '#64748b' : '#0f172a';
+          ctx.font = 'bold 11px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(p.toFixed(2), x + barW / 2, y - 5);
+
+          ctx.fillStyle = '#334155';
+          ctx.font = '600 11px sans-serif';
+          ctx.fillText(t.slice(0, 6), x + barW / 2, H - 12);
+        });
+
+        const yTh = padT + plotH - (sc.faaDelta / maxVal) * plotH;
+        ctx.beginPath();
+        ctx.setLineDash([5, 4]);
+        ctx.strokeStyle = '#e11d48';
+        ctx.lineWidth = 2;
+        ctx.moveTo(padL, yTh);
+        ctx.lineTo(W - padR, yTh);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#e11d48';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(`δ = ${sc.faaDelta.toFixed(2)}`, W - padR - 4, Math.max(14, yTh - 5));
+      }
+
+      const cProb = setupCanvas('canvas-prob-lines');
+      if (cProb) {
+        const { ctx, W, H } = cProb;
+        ctx.clearRect(0, 0, W, H);
+        const types = STATE.initData.anomaly_types;
+        for (let c = 1; c < 12; c++) {
+          const tName = types[c];
+          const isSup = sc.suppressed.has(c);
+          const colArr = d.pred_label.map(r => r[c]);
+          drawSeriesLine(
+            ctx, colArr, iStart, iEnd, W, H, 12, 12,
+            CLASS_COLORS[tName], isSup ? 1.0 : 1.7, isSup, [0, 1.0]
+          );
+        }
+      }
+    }
+
+    function onZoomSliderChange() {
+      renderMonitorCharts();
+    }
+
+    function focusAnomalyPeak() {
+      const sc = computeClientScores();
+      if (!sc) return;
+      let bestI = 0;
+      for (let i = 1; i < sc.totalScore.length; i++) {
+        if (sc.totalScore[i] > sc.totalScore[bestI]) bestI = i;
+      }
+      const pct = Math.round((bestI / sc.totalScore.length) * 100);
+      document.getElementById('zoom-start').value = Math.max(0, pct - 12);
+      document.getElementById('zoom-end').value = Math.min(100, pct + 12);
+      renderMonitorCharts();
+    }
+
+    function resetZoom(redraw = true) {
+      document.getElementById('zoom-start').value = 0;
+      document.getElementById('zoom-end').value = 100;
+      if (redraw) renderMonitorCharts();
+    }
+
+    function renderBenchmarkCard(dsKey) {
+      STATE.benchDataset = dsKey;
+      ['aiops', 'smd', 'msl', 'smap'].forEach(k => {
+        const btn = document.getElementById('bcard-' + k);
+        if (btn) {
+          btn.className = k === dsKey
+            ? "px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-500 text-white shadow-sm"
+            : "px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900";
+        }
+      });
+
+      const sumObj = STATE.initData.summaries[dsKey];
+      if (!sumObj) return;
+
+      const curRows = sumObj.current.filter(r => String(r.setting).includes('per-') && r.paper !== null);
+      const legMap = {};
+      (sumObj.legacy || []).filter(r => String(r.setting).includes('per-')).forEach(r => {
+        legMap[r.metric] = r['ours (mean)'];
+      });
+
+      const container = document.getElementById('bench-bars-container');
+      container.innerHTML = curRows.map(r => {
+        const ours = Number(r['ours (mean)']);
+        const std = Number(r['std (seeds)'] || 0);
+        const paper = Number(r['paper']);
+        const leg = legMap[r.metric] !== undefined ? Number(legMap[r.metric]) : null;
+        const diff = ours - paper;
+        const badgeCls = diff >= 0
+          ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+          : 'bg-amber-100 text-amber-700 border-amber-200';
+
+        return `
+          <div class="p-3 rounded-xl bg-slate-50/90 border border-slate-200/80 space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-extrabold text-slate-800 text-sm">${r.metric}</span>
+              <div class="flex items-center gap-3 font-mono">
+                <span class="text-emerald-700 font-bold">Ours: ${ours.toFixed(3)} ± ${std.toFixed(3)}</span>
+                <span class="text-sky-700 font-semibold">Paper: ${paper.toFixed(3)}</span>
+                ${leg !== null ? `<span class="text-slate-400">Legacy: ${leg.toFixed(3)}</span>` : ''}
+                <span class="px-2 py-0.5 rounded-full text-xs font-bold border ${badgeCls}">
+                  ${diff >= 0 ? '+' : ''}${diff.toFixed(3)}
+                </span>
+              </div>
+            </div>
+            <div class="space-y-1">
+              <div class="w-full h-2.5 bg-slate-200/70 rounded-full overflow-hidden">
+                <div class="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" style="width:${Math.min(100, ours * 100)}%"></div>
+              </div>
+              <div class="w-full h-2 bg-slate-200/70 rounded-full overflow-hidden">
+                <div class="h-full bg-sky-500 rounded-full" style="width:${Math.min(100, paper * 100)}%"></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      filterLeaderboard();
+    }
+
+    function filterLeaderboard() {
+      const q = (document.getElementById('inp-search-ent').value || '').toLowerCase();
+      const rows = (STATE.initData.leaderboards[STATE.benchDataset] || []).filter(r =>
+        r.entity.toLowerCase().includes(q)
+      );
+      const tbody = document.getElementById('leaderboard-tbody');
+      tbody.innerHTML = rows.map((r, idx) => `
+        <tr class="hover:bg-rose-50/50 transition">
+          <td class="py-2.5 px-3.5 font-bold text-slate-400">${idx + 1}</td>
+          <td class="py-2.5 px-3.5 font-bold text-slate-800 font-mono">${r.entity}</td>
+          <td class="py-2.5 px-3.5 font-mono text-emerald-700 font-bold">${r.vus_roc_mean.toFixed(4)} <span class="text-slate-400 font-normal">± ${r.vus_roc_std.toFixed(3)}</span></td>
+          <td class="py-2.5 px-3.5 font-mono">${r.rauc_roc_mean.toFixed(4)}</td>
+          <td class="py-2.5 px-3.5 font-mono font-semibold text-indigo-600">${r.rauc_pr_mean.toFixed(4)}</td>
+          <td class="py-2.5 px-3.5 font-mono">${r.vus_pr_mean.toFixed(4)}</td>
+          <td class="py-2.5 px-3.5 font-mono">${r.rf_mean.toFixed(4)}</td>
+          <td class="py-2.5 px-3.5 font-mono text-rose-600 font-bold">${r.rf_oracle_mean !== null ? r.rf_oracle_mean.toFixed(4) : '—'}</td>
+          <td class="py-2.5 px-3.5 text-right">
+            <button onclick="jumpToEntity('${STATE.benchDataset}', '${r.entity}')" class="px-3 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 font-bold text-xs transition">
+              Xem
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function jumpToEntity(dsKey, entName) {
+      document.getElementById('sel-dataset').value = dsKey;
+      STATE.currentDataset = dsKey;
+      populateEntities(dsKey);
+      document.getElementById('sel-entity').value = entName;
+      STATE.currentEntity = entName;
+      populateSeeds();
+      await loadRunData();
+      switchTab('monitor');
+    }
+
+    function renderLossChart() {
+      const c = setupCanvas('canvas-loss');
+      if (!c || !STATE.runData) return;
+      const { ctx, W, H } = c;
+      ctx.clearRect(0, 0, W, H);
+      const losses = STATE.runData.losses || {};
+      if (losses.train_loss_ae) {
+        drawSeriesLine(ctx, losses.train_loss_ae, 0, losses.train_loss_ae.length, W, H, 18, 18, '#10b981', 2.3);
+      }
+      if (losses.valid_loss_ae) {
+        drawSeriesLine(ctx, losses.valid_loss_ae, 0, losses.valid_loss_ae.length, W, H, 18, 18, '#0ea5e9', 1.9, true);
+      }
+      if (losses.train_loss_c) {
+        drawSeriesLine(ctx, losses.train_loss_c, 0, losses.train_loss_c.length, W, H, 18, 18, '#9333ea', 2.1);
+      }
+    }
+
+    function renderTsneScreen() {
+      const d = STATE.runData;
+      if (!d) return;
+      const c = setupCanvas('canvas-tsne');
+      if (c && d.embedding_2d && d.embedding_2d.length > 0) {
+        const { ctx, W, H } = c;
+        ctx.clearRect(0, 0, W, H);
+        const pts = d.embedding_2d;
+        let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+        pts.forEach(p => {
+          if (p.x < xMin) xMin = p.x;
+          if (p.x > xMax) xMax = p.x;
+          if (p.y < yMin) yMin = p.y;
+          if (p.y > yMax) yMax = p.y;
+        });
+        const pad = 28;
+        const mapX = x => pad + ((x - xMin) / ((xMax - xMin) || 1)) * (W - 2 * pad);
+        const mapY = y => H - pad - ((y - yMin) / ((yMax - yMin) || 1)) * (H - 2 * pad);
+
+        pts.filter(p => !p.is_peak).forEach(p => {
+          ctx.beginPath();
+          ctx.fillStyle = CLASS_COLORS[p.group] || '#64748b';
+          ctx.globalAlpha = 0.75;
+          ctx.arc(mapX(p.x), mapY(p.y), 4.8, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        ctx.globalAlpha = 1.0;
+        pts.filter(p => p.is_peak).forEach(p => {
+          const px = mapX(p.x), py = mapY(p.y);
+          ctx.strokeStyle = '#e11d48';
+          ctx.lineWidth = 2.4;
+          ctx.beginPath();
+          ctx.moveTo(px - 5, py - 5); ctx.lineTo(px + 5, py + 5);
+          ctx.moveTo(px + 5, py - 5); ctx.lineTo(px - 5, py + 5);
+          ctx.stroke();
+        });
+      }
+
+      const types = STATE.initData.anomaly_types.slice(1);
+      const sig = d.peak_signature;
+      const sigWrap = document.getElementById('signature-bars');
+      sigWrap.innerHTML = types.map((t, idx) => {
+        const pct = (sig[idx] * 100);
+        return `
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs font-bold">
+              <span class="uppercase" style="color:${CLASS_COLORS[t]}">${t}</span>
+              <span class="font-mono text-slate-700">${pct.toFixed(1)}%</span>
+            </div>
+            <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div class="h-full rounded-full" style="width:${Math.min(100, pct * 1.4)}%; background:${CLASS_COLORS[t]}"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      let bestI = 0;
+      for (let i = 1; i < sig.length; i++) if (sig[i] > sig[bestI]) bestI = i;
+      const topType = types[bestI];
+      document.getElementById('xai-conclusion-box').innerHTML = `
+        <b>Chẩn đoán XAI:</b> Vùng đỉnh của <code>${d.entity}</code>
+        thuộc cụm <b>${topType.toUpperCase()}</b> (${CLASS_DESC_VI[topType]}).
+      `;
+    }
+
+    function buildLiveAugPills() {
+      const types = STATE.initData.anomaly_types.slice(1);
+      const wrap = document.getElementById('live-aug-pills');
+      wrap.innerHTML = types.map(t => `
+        <button onclick="selectLiveAug('${t}')" id="pill-aug-${t}" class="px-3 py-1.5 rounded-lg text-xs font-extrabold uppercase transition border ${
+          t === STATE.liveAugType
+            ? 'text-white shadow-sm'
+            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+        }" style="${t === STATE.liveAugType ? `background:${CLASS_COLORS[t]}; border-color:${CLASS_COLORS[t]}` : ''}">
+          ${t}
+        </button>
+      `).join('');
+    }
+
+    async function selectLiveAug(augType) {
+      STATE.liveAugType = augType;
+      buildLiveAugPills();
+      document.getElementById('soft-focus-name').textContent = augType.toUpperCase();
+      renderSoftLabels();
+      await triggerLiveInject();
+    }
+
+    async function triggerLiveInject() {
+      const winStart = document.getElementById('live-win-slider').value;
+      const injSeed = document.getElementById('live-seed-slider').value;
+      const url = `/api/inject?dataset=${encodeURIComponent(STATE.currentDataset)}&entity=${encodeURIComponent(STATE.currentEntity)}&seed=${STATE.currentSeed}&win_start=${winStart}&aug_type=${STATE.liveAugType}&channel=${STATE.currentChannel}&inj_seed=${injSeed}`;
+      const res = await fetch(url);
+      STATE.liveData = await res.json();
+      renderLiveCharts();
+      renderAugScreen();
+    }
+
+    function renderLiveCharts() {
+      const ld = STATE.liveData;
+      if (!ld || ld.error) return;
+
+      document.getElementById('live-mse-before').textContent = ld.mse_before.toFixed(5);
+      const diffMse = ld.mse_after - ld.mse_before;
+      document.getElementById('live-mse-after').innerHTML =
+        `${ld.mse_after.toFixed(5)} <span class="text-xs font-bold">(${diffMse >= 0 ? '+' : ''}${diffMse.toFixed(5)})</span>`;
+
+      const types = STATE.initData.anomaly_types;
+      let topIdx = 1;
+      for (let c = 2; c < 12; c++) {
+        if (ld.prob_after[c] > ld.prob_after[topIdx]) topIdx = c;
+      }
+      document.getElementById('live-pred-cls').textContent =
+        `${types[topIdx].toUpperCase()} (${(ld.prob_after[topIdx] * 100).toFixed(1)}%)`;
+
+      const cW = setupCanvas('canvas-live-wave');
+      if (cW) {
+        const { ctx, W, H } = cW;
+        ctx.clearRect(0, 0, W, H);
+        if (ld.mask_range) {
+          const x0 = (ld.mask_range[0] / 100) * W;
+          const x1 = ((ld.mask_range[1] + 1) / 100) * W;
+          ctx.fillStyle = "rgba(244, 63, 94, 0.16)";
+          ctx.fillRect(x0, 0, x1 - x0, H);
+        }
+        const allVals = [...ld.orig_signal, ...ld.inj_signal, ...ld.rec_signal];
+        const range = [Math.min(...allVals) - 0.05, Math.max(...allVals) + 0.05];
+        drawSeriesLine(ctx, ld.orig_signal, 0, ld.orig_signal.length, W, H, 14, 14, '#94a3b8', 1.8, true, range);
+        drawSeriesLine(ctx, ld.inj_signal, 0, ld.inj_signal.length, W, H, 14, 14, '#f43f5e', 2.5, false, range);
+        drawSeriesLine(ctx, ld.rec_signal, 0, ld.rec_signal.length, W, H, 14, 14, '#0284c7', 2.1, false, range);
+      }
+
+      const cP = setupCanvas('canvas-live-probs');
+      if (cP) {
+        const { ctx, W, H } = cP;
+        ctx.clearRect(0, 0, W, H);
+        const padL = 24, padR = 12, padT = 16, padB = 34;
+        const plotW = W - padL - padR, plotH = H - padT - padB;
+        const groupW = plotW / 12;
+        const barW = groupW * 0.34;
+
+        types.forEach((t, idx) => {
+          const xg = padL + idx * groupW;
+          const h0 = ld.prob_before[idx] * plotH;
+          const h1 = ld.prob_after[idx] * plotH;
+
+          ctx.fillStyle = '#cbd5e1';
+          ctx.fillRect(xg + 2, padT + plotH - h0, barW, Math.max(2, h0));
+
+          ctx.fillStyle = CLASS_COLORS[t];
+          ctx.fillRect(xg + 4 + barW, padT + plotH - h1, barW, Math.max(2, h1));
+
+          ctx.fillStyle = '#334155';
+          ctx.font = 'bold 11px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(t.slice(0, 5), xg + groupW / 2, H - 12);
+        });
+      }
+    }
+
+    function renderSoftLabels() {
+      const alpha = parseFloat(document.getElementById('soft-alpha').value);
+      const beta = parseFloat(document.getElementById('soft-beta').value);
+      document.getElementById('lbl-alpha').textContent = alpha.toFixed(2);
+      document.getElementById('lbl-beta').textContent = beta.toFixed(3);
+
+      const types = STATE.initData ? STATE.initData.anomaly_types : [];
+      const K = types.length;
+      const focusIdx = Math.max(1, types.indexOf(STATE.liveAugType));
+      const wrap = document.getElementById('soft-label-bars');
+
+      wrap.innerHTML = types.map((t, i) => {
+        const oneHot = i === focusIdx ? 1.0 : 0.0;
+        let soft = oneHot * (1.0 - alpha - K * beta) + beta;
+        if (i === 0) soft += alpha;
+        const pct = Math.max(0, Math.min(100, soft * 100));
+        return `
+          <div class="bg-white p-2 rounded-xl border border-slate-200 text-center space-y-1">
+            <div class="text-xs font-extrabold uppercase truncate" style="color:${CLASS_COLORS[t]}">${t}</div>
+            <div class="w-full h-12 bg-slate-100 rounded-lg flex items-end p-1">
+              <div class="w-full rounded transition-all" style="height:${pct}%; background:${CLASS_COLORS[t]}"></div>
+            </div>
+            <div class="text-xs font-mono font-bold text-slate-700">${soft.toFixed(3)}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderAugScreen() {
+      renderSoftLabels();
+      const ld = STATE.liveData;
+      if (!ld || !ld.grid_12) return;
+      const types = STATE.initData.anomaly_types;
+      const gridWrap = document.getElementById('grid-12-container');
+      gridWrap.innerHTML = types.map((t, idx) => `
+        <div class="bg-white rounded-xl p-3 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between text-xs font-extrabold mb-1.5">
+            <span style="color:${CLASS_COLORS[t]}">(${idx + 1}) ${t.toUpperCase()}</span>
+            <span class="text-slate-400 font-normal truncate max-w-[140px]">${CLASS_DESC_VI[t]}</span>
+          </div>
+          <canvas id="mini-aug-${t}" class="w-full h-[96px] rounded-lg bg-slate-50"></canvas>
+        </div>
+      `).join('');
+
+      requestAnimationFrame(() => {
+        types.forEach(t => {
+          const c = setupCanvas(`mini-aug-${t}`);
+          const item = ld.grid_12[t];
+          if (!c || !item) return;
+          const { ctx, W, H } = c;
+          ctx.clearRect(0, 0, W, H);
+          if (item.mask_range) {
+            const x0 = (item.mask_range[0] / 100) * W;
+            const x1 = ((item.mask_range[1] + 1) / 100) * W;
+            ctx.fillStyle = "rgba(244, 63, 94, 0.16)";
+            ctx.fillRect(x0, 0, x1 - x0, H);
+          }
+          const vals = [...item.orig, ...item.aug];
+          const rng = [Math.min(...vals) - 0.04, Math.max(...vals) + 0.04];
+          drawSeriesLine(ctx, item.orig, 0, item.orig.length, W, H, 8, 8, '#94a3b8', 1.4, true, rng);
+          drawSeriesLine(ctx, item.aug, 0, item.aug.length, W, H, 8, 8, CLASS_COLORS[t], 2.0, false, rng);
+        });
+      });
+    }
+
+    function renderAllActiveCharts() {
+      if (STATE.currentTab === 'monitor') renderMonitorCharts();
+      else if (STATE.currentTab === 'bench') renderLossChart();
+      else if (STATE.currentTab === 'tsne') renderTsneScreen();
+      else if (STATE.currentTab === 'live') renderLiveCharts();
+      else if (STATE.currentTab === 'aug') renderAugScreen();
+    }
+
+    window.addEventListener('resize', () => renderAllActiveCharts());
+    initApp();
+  </script>
+</body>
+</html>

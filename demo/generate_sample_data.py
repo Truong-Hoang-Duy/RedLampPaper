@@ -9,10 +9,12 @@ from pathlib import Path
 import numpy as np
 import torch
 
-# Thêm thư mục gốc của project vào sys.path
+# Thêm thư mục gốc của project và RedLamp vào sys.path
 ROOT_DIR = Path(__file__).resolve().parent.parent
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+REDLAMP_DIR = ROOT_DIR / "RedLamp"
+for p in (REDLAMP_DIR, ROOT_DIR):
+    if p.exists() and str(p) not in sys.path:
+        sys.path.insert(0, str(p))
 
 import utils
 from models.meta import ConvAEC

@@ -1,0 +1,7 @@
+﻿dataset,setting,metric,ours (mean),std (seeds),paper,diff,#entities,#seeds,status
+AIOps,per-entity,VUS-ROC,0.926,0.004,0.911,0.015,29,5,"complete (đủ entity × 5 seed), protocol paper"
+AIOps,per-entity,VUS-PR,0.458,0.009,0.448,0.01,29,5,"complete (đủ entity × 5 seed), protocol paper"
+AIOps,per-entity,RF,0.18,0.007,0.179,0.001,29,5,"complete (đủ entity × 5 seed), protocol paper"
+AIOps,per-entity,R-AUC-ROC,0.954,0.002,0.94,0.014,29,5,"complete (đủ entity × 5 seed), protocol paper"
+AIOps,per-entity,R-AUC-PR,0.66,0.011,0.636,0.024,29,5,"complete (đủ entity × 5 seed), protocol paper"
+AIOps,per-entity,RF (oracle),0.299,0.005,,,29,5,"complete (đủ entity × 5 seed), protocol paper"

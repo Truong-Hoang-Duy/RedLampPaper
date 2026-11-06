@@ -1,0 +1,13 @@
+﻿dataset,setting,metric,ours (mean),std (seeds),paper,diff,#entities,#seeds,status
+MSL,per-channel,VUS-ROC,0.731,0.017,0.753,-0.022,23,5,"complete (đủ entity × 5 seed), protocol paper"
+MSL,per-channel,VUS-PR,0.469,0.022,0.482,-0.013,23,5,"complete (đủ entity × 5 seed), protocol paper"
+MSL,per-channel,RF,0.244,0.024,0.254,-0.01,23,5,"complete (đủ entity × 5 seed), protocol paper"
+MSL,per-channel,R-AUC-ROC,0.754,0.018,0.766,-0.012,23,5,"complete (đủ entity × 5 seed), protocol paper"
+MSL,per-channel,R-AUC-PR,0.502,0.028,0.507,-0.005,23,5,"complete (đủ entity × 5 seed), protocol paper"
+MSL,per-channel,RF (oracle),0.523,0.018,,,23,5,"complete (đủ entity × 5 seed), protocol paper"
+MSL,aggregate (tham khảo),VUS-ROC,0.483,0.056,0.753,-0.27,1,5,tham khảo (không dùng để so với paper)
+MSL,aggregate (tham khảo),VUS-PR,0.14,0.018,0.482,-0.342,1,5,tham khảo (không dùng để so với paper)
+MSL,aggregate (tham khảo),RF,0.176,0.119,0.254,-0.078,1,5,tham khảo (không dùng để so với paper)
+MSL,aggregate (tham khảo),R-AUC-ROC,0.538,0.05,0.766,-0.228,1,5,tham khảo (không dùng để so với paper)
+MSL,aggregate (tham khảo),R-AUC-PR,0.166,0.02,0.507,-0.341,1,5,tham khảo (không dùng để so với paper)
+MSL,aggregate (tham khảo),RF (oracle),0.278,0.066,,,1,5,tham khảo (không dùng để so với paper)

@@ -1,0 +1,177 @@
+# =============================================================================
+# 1. Project-Specific: Retraining, Results, & Extracted Datasets
+# =============================================================================
+redlamp_retraining/
+result/
+RedLamp/result/
+training/
+RedLamp/training/
+outputs/
+runs/
+checkpoints/
+
+# Extracted / downloaded datasets in RedLamp/dataset/ (keep tracked NASA.zip)
+RedLamp/dataset/*
+!RedLamp/dataset/NASA.zip
+
+# Keep demo sample_results and portable_data intact
+!demo/sample_results/**
+!demo/portable_data/**
+
+# =============================================================================
+# 2. Machine Learning / PyTorch / Experiment Tracking
+# =============================================================================
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.safetensors
+*.h5
+*.hdf5
+*.tflite
+*.pb
+
+# Experiment trackers & logs
+wandb/
+mlruns/
+lightning_logs/
+tensorboard_logs/
+events.out.tfevents.*
+
+# =============================================================================
+# 3. Python Bytecode, Packaging & Distribution
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller / Cython
+*.manifest
+*.spec
+*.c
+
+# =============================================================================
+# 4. Virtual Environments & Conda
+# =============================================================================
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+conda-meta/
+.conda/
+.python-version
+
+# =============================================================================
+# 5. Jupyter Notebook / IPython
+# =============================================================================
+.ipynb_checkpoints/
+profile_default/
+ipython_config.py
+
+# =============================================================================
+# 6. Testing, Coverage, Linting & Type Checking
+# =============================================================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.pyre/
+.pytype/
+cython_debug/
+
+# =============================================================================
+# 7. Environment Variables & Secrets
+# =============================================================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# =============================================================================
+# 8. IDEs & Editors
+# =============================================================================
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# =============================================================================
+# 9. Operating System Files (macOS, Windows, Linux)
+# =============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+.nfs*
+
+# =============================================================================
+# 10. Logs, Archives & Temporary Files
+# =============================================================================
+*.log
+logs/
+*.tmp
+*.temp
+*.bak
+*.old
+tmp/
+temp/

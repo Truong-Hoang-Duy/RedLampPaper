@@ -1,0 +1,7 @@
+dataset,setting,metric,ours (mean),std (seeds),paper,diff,#entities,#seeds,status
+AIOps,per-entity,VUS-ROC,0.911,0.004,0.911,-0.0,29,5,complete (paper protocol)
+AIOps,per-entity,VUS-PR,0.282,0.006,0.448,-0.166,29,5,complete (paper protocol)
+AIOps,per-entity,RF,0.196,0.003,0.179,0.017,29,5,complete (paper protocol)
+AIOps,per-entity,RF (mean+3std),0.114,0.008,,,29,5,complete (paper protocol)
+AIOps,per-entity,R-AUC-ROC,0.942,0.001,0.94,0.002,29,5,complete (paper protocol)
+AIOps,per-entity,R-AUC-PR,0.449,0.007,0.636,-0.187,29,5,complete (paper protocol)

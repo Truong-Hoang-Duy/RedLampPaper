@@ -1,0 +1,7 @@
+﻿dataset,setting,metric,ours (mean),std (seeds),paper,diff,#entities,#seeds,status
+SMD,per-entity,VUS-ROC,0.823,0.005,0.813,0.01,28,5,"complete (đủ entity × 5 seed), protocol paper"
+SMD,per-entity,VUS-PR,0.374,0.013,0.366,0.008,28,5,"complete (đủ entity × 5 seed), protocol paper"
+SMD,per-entity,RF,0.239,0.009,0.235,0.004,28,5,"complete (đủ entity × 5 seed), protocol paper"
+SMD,per-entity,R-AUC-ROC,0.853,0.003,0.837,0.016,28,5,"complete (đủ entity × 5 seed), protocol paper"
+SMD,per-entity,R-AUC-PR,0.448,0.014,0.429,0.019,28,5,"complete (đủ entity × 5 seed), protocol paper"
+SMD,per-entity,RF (oracle),0.379,0.014,,,28,5,"complete (đủ entity × 5 seed), protocol paper"
