@@ -1,5 +1,6 @@
 from loaders.load import load_data
 from loaders.loader_aug import Loader_aug, Loader_aug_batch
+from loaders.loader_test import Loader_test
 
 
 import numpy as np
@@ -76,6 +77,15 @@ def load_dataloader_aug(dataparams, anomaly_types=None, anomaly_types_for_dict=N
                     root_dir=dataset_path,
                     verbose=True,
                     validation=False)
+
+        if anomaly_types == ['normal']:
+            # same windows/batches as Loader_aug below, sliced lazily instead of materialized (RAM)
+            return Loader_test(dataset=test_dataset,
+                               batch_size=dataparams.batch_size,
+                               window_size=dataparams.window_size,
+                               window_step=1,
+                               anomaly_types_for_dict=anomaly_types_for_dict,
+                               verbose=True,)
 
         test_dataloader = Loader_aug(dataset=test_dataset,
                                     batch_size=dataparams.batch_size,

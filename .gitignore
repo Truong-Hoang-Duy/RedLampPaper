@@ -2,6 +2,7 @@
 # 1. Project-Specific: Retraining, Results, & Extracted Datasets
 # =============================================================================
 redlamp_retraining/
+redlamp_ori/
 result/
 RedLamp/result/
 training/
@@ -120,7 +121,8 @@ cython_debug/
 # =============================================================================
 # 8. IDEs & Editors
 # =============================================================================
-.vscode/
+.vscode/*
+!.vscode/tasks.json
 .idea/
 *.iml
 *.iws

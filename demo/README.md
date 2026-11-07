@@ -7,8 +7,23 @@ Kết nối trực tiếp với kho thực nghiệm **`redlamp_retraining/` (15.
 
 ---
 
-## 1. Cách khởi chạy Web Studio (Khuyên dùng — Giao diện Sáng, Mượt 60fps)
+## 1. Cách khởi chạy Web Studio (Hỗ trợ cả Windows & macOS)
 
+### Cách 1: Chạy trực tiếp bằng Run Task trong VS Code / Antigravity (Nhanh nhất)
+- **Windows:** Nhấn tổ hợp phím `Ctrl + Shift + B` (hoặc vào `Terminal -> Run Task...` $\to$ chọn **`🚀 Run RedLamp Web Studio (Port 8080)`** hoặc **`🌐 Run Demo + Auto Open Browser (Win & macOS)`**).
+- **macOS:** Nhấn tổ hợp phím `Cmd + Shift + B` (hoặc `Terminal -> Run Task...`).
+
+### Cách 2: Chạy bằng Script 1-Click (Tự động kiểm tra thư viện & mở trình duyệt)
+- **Trên Windows (PowerShell / CMD / Double-click):**
+  ```powershell
+  .\run_demo.bat
+  ```
+- **Trên macOS / Linux:**
+  ```bash
+  bash ./run_demo.sh
+  ```
+
+### Cách 3: Chạy thủ công qua Terminal
 Từ thư mục gốc của project (`RedLampPaper/`), chạy:
 
 ```bash

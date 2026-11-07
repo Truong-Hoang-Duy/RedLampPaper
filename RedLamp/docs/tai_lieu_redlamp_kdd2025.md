@@ -1,361 +1,287 @@
-# TÀI LIỆU NGHIÊN CỨU TOÀN DIỆN & SỔ TAY HƯỚNG DẪN TÁI LẬP THỰC NGHIỆM
-**Bài báo:** *Robust and Explainable Detector of Time Series Anomaly via Augmenting Multiclass Pseudo-Anomalies (REDLAMP)*  
-**Tác giả:** Kohei Obata, Yasuko Matsubara, Yasushi Sakurai (SANKEN, University of Osaka, Japan)  
-**Hội nghị:** Proceedings of the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining V.2 (KDD '25)  
-**Mã bài báo:** arXiv:2505.20765v1 | **DOI:** 10.1145/3711896.3737110 | **GitHub:** `https://github.com/KoheiObata/RedLamp`
+# 📘 CẨM NANG GIẢI MÃ BÀI BÁO REDLAMP (KDD '25) — DÀNH CHO NGƯỜI MỚI BẮT ĐẦU MACHINE LEARNING
+
+**Tên bài báo:** *Robust and Explainable Detector of Time Series Anomaly via Augmenting Multiclass Pseudo-Anomalies (REDLAMP)*  
+**Tác giả:** Kohei Obata, Yasuko Matsubara, Yasushi Sakurai (Đại học Osaka, Nhật Bản) — **Hội nghị KDD '25**  
+
+> **🎯 Mục tiêu của tài liệu này:**  
+> Tài liệu này được biên soạn lại theo phong cách **"cầm tay chỉ việc"**, dành cho người chỉ mới biết sơ qua về Machine Learning. Mọi **từ viết tắt**, **ký hiệu toán học lạ mắt** và **công thức từ (1) đến (8)** đều được dịch sang ngôn ngữ đời thường và minh họa bằng **ví dụ con số cụ thể (nhẩm tính được ngay)**.
 
 ---
 
-## PHẦN 1: TỪ ĐIỂN KHÁI NIỆM NỀN TẢNG CHO NGƯỜI MỚI BẮT ĐẦU
-*(Phần này tổng hợp các khái niệm thực tế đã được giải nghĩa chi tiết để làm nền tảng trước khi đọc công thức toán học)*
+## PHẦN 1: TỪ ĐIỂN GIẢI NGHĨA TẤT CẢ CÁC TỪ VIẾT TẮT (TRA CỨU NHANH)
 
-### 1.1. Cấu trúc Bộ dữ liệu Chuỗi thời gian (Dataset Structure)
-* **Số tập dữ liệu con (`# Subdatasets`):** Một bộ dữ liệu lớn (như SMD, UCR) không phải là 1 bảng duy nhất mà là tập hợp của nhiều thực thể độc lập.
-  * *Ví dụ:* Bộ **SMD** có `28 tập con` tương ứng với **28 máy chủ (servers)** khác nhau. Bộ **UCR** có `250 tập con` từ 9 lĩnh vực (nhịp tim ECG, huyết áp, nhiệt độ...). Khi huấn luyện trên UCR, AIOps và SMD, ta phải huấn luyện mô hình riêng cho từng tập con rồi lấy trung bình kết quả.
-* **Số chiều đặc trưng (`# Features` - $D$):** Số lượng cột dữ liệu (cảm biến/chỉ số) được theo dõi cùng lúc tại một thời điểm (sau khi đã bỏ cột thời gian `timestamp` và cột nhãn `label`).
-  * **Đơn biến (Univariate, $D = 1$):** Chỉ theo dõi 1 cột giá trị duy nhất theo thời gian (ví dụ: UCR, AIOps).
-  * **Đa biến (Multivariate, $D > 1$):** Theo dõi nhiều cột cảm biến cùng lúc (ví dụ: SMD có $D = 38$ chỉ số CPU, RAM, Disk...; SMAP có $D = 55$; MSL có $D = 25$).
-* **Độ dài chuỗi Train trung bình (`Sequence Length` - $T$):** Số lượng điểm thời gian (số dòng dữ liệu) trung bình trong tập huấn luyện của 1 tập con.
-  * *Quy đổi ra thời gian thực:* Với SMD ($T = 25,300$ điểm), tần suất thu thập là 1 phút/điểm $\implies 25,300 \text{ phút} \approx 17.5 \text{ ngày}$ theo dõi liên tục. Với nhịp tim ECG (250 điểm/giây), chuỗi $30,522$ điểm tương đương khoảng $2$ phút đo.
+Khi đọc bài báo hoặc xem giao diện Demo, bạn sẽ liên tục gặp các chữ viết tắt dưới đây. Hãy dùng bảng này để tra cứu:
 
-### 1.2. Cửa sổ trượt (Sliding Window)
-* **Bản chất:** Mạng Học sâu không thể nuốt trọn chuỗi dài hàng chục nghìn điểm cùng lúc. Ta dùng một khung nhìn có độ dài cố định $L = 100$ điểm thời gian (`window_size = 100`) trượt dọc theo chuỗi dài $T$ với bước nhảy $S$ (`stride` / `window_step`).
-* **Ví dụ thời gian thực:** Giám sát máy chủ mỗi phút 1 điểm với cửa sổ $L = 5$, bước nhảy $S = 1$:
-  * Cửa sổ 1: `[08:00 -> 08:04]`
-  * Cửa sổ 2 (trượt 1 phút): `[08:01 -> 08:05]`
-* **Ý nghĩa:** Giúp mô hình nhìn thấy **ngữ cảnh quá khứ** để phát hiện bất thường ngữ cảnh (Contextual Anomaly), đồng thời biến ma trận 2D `(T, D)` thành Tensor 3D `(N, D, L)` với số mẫu $N = \lfloor \frac{T - L}{S} \rfloor + 1$.
+### 1.1. Các thuật ngữ của riêng phương pháp REDLAMP
+| Viết tắt | Tiếng Anh đầy đủ | Nghĩa Tiếng Việt | Giải thích bình dân trong 1 câu |
+| :--- | :--- | :--- | :--- |
+| **TSAD** | *Time Series Anomaly Detection* | Phát hiện bất thường chuỗi thời gian | Bài toán tìm xem ở giây/phút thứ mấy thì cảm biến (nhiệt độ, nhịp tim, CPU...) bị nhảy số bất thường. |
+| **REDLAMP** | *Robust and Explainable Detector of Time Series Anomaly via Augmenting Multiclass Pseudo-Anomalies* | Bộ phát hiện bất thường bền vững & có tính giải thích bằng cách tạo bất thường giả đa lớp | Tên mô hình của bài báo: tự tạo ra **11 kiểu lỗi giả** để dạy AI vừa biết bắt lỗi, vừa chỉ ra được lỗi đó thuộc hình dạng nào. |
+| **AM** | *Anomaly Mask* ($W$) | Mặt nạ đánh dấu vùng lỗi | Một tấm bìa chỉ gồm số `0` và `1`, đánh dấu chính xác khúc nào vừa bị chèn lỗi giả để "che mắt" không cho bộ vẽ lại (Decoder) học vẹt lỗi đó. |
+| **BC** | *Backward Correction* | Hiệu chỉnh ngược (Nhãn mềm) | Thay vì bắt AI tin tuyệt đối 100% rằng mẫu tạo ra là lỗi (`[0, 1]`), ta giảm xuống còn 79% và luôn chừa 11% khả năng nó vẫn là bình thường (`[0.11, 0.79...]`). |
+| **FAA** | *Frequent Anomaly Adjustment* | Bộ lọc bất thường xuất hiện quá thường xuyên | Quy tắc: *"Bất thường thật thì phải hiếm"*. Nếu lúc chạy thực tế mà AI bảo một loại lỗi xuất hiện quá 5% tổng thời gian ($\delta = 0.05$), bộ lọc FAA sẽ coi đó là báo động giả và gạch điểm của loại đó về `0`. |
 
-### 1.3. Quy trình "5 lần chạy độc lập" (`5 runs`)
-* Trong Deep Learning, việc khởi tạo trọng số mạng ban đầu, trộn dữ liệu (`shuffle`), lớp `Dropout` và chọn vị trí chèn bất thường giả đều mang tính ngẫu nhiên.
-* Để chứng minh kết quả không phải do "ăn may", tác giả chạy toàn bộ quá trình Train & Test lặp lại **5 lần với 5 hạt giống ngẫu nhiên (`random seed`) khác nhau**, sau đó lấy trung bình cộng kết quả của cả 5 lần.
+### 1.2. Các thuật ngữ Mô hình Học sâu (Deep Learning) & Hàm mất mát (Loss)
+| Viết tắt | Tiếng Anh đầy đủ | Nghĩa Tiếng Việt | Giải thích bình dân trong 1 câu |
+| :--- | :--- | :--- | :--- |
+| **AE** | *Autoencoder* | Mạng tự mã hóa (Nén & Khôi phục) | Mạng gồm 2 nửa: **Encoder** (nén đoạn sóng dài thành vài con số tóm tắt) và **Decoder** (từ vài con số đó vẽ khôi phục lại đoạn sóng ban đầu). |
+| **1D-CNN** | *1D Convolutional Neural Network* | Mạng tích chập 1 chiều | Mạng dùng một "kính lúp" trượt dọc theo trục thời gian để nhận diện hình dáng sóng (gai nhọn, dốc lên, sóng sin...). |
+| **MLP** | *Multi-Layer Perceptron* | Mạng nơ-ron đa tầng (Classifier) | Khối mạng đóng vai **"Bác sĩ chẩn đoán"**: nhận bản tóm tắt từ Encoder rồi phán đoán đoạn sóng thuộc lớp nào trong 12 lớp. |
+| **Embedding** | *Latent Embedding Vector* | Vector biểu diễn tiềm ẩn (128 số) | **"Tờ phiếu khám bệnh 128 con số"** do Encoder tóm tắt từ đoạn sóng đầu vào. Từ tờ phiếu này, Classifier sẽ đoán bệnh và Decoder sẽ vẽ lại sóng. |
+| **MSE** | *Mean Squared Error* ($\mathcal{L}_{\text{MSE}}$) | Sai số bình phương trung bình | Đo xem **hình vẽ lại của Decoder khác hình gốc bao nhiêu**: lấy `(Gốc - Vẽ lại)` bình phương lên. Nếu lệch nhiều $\implies$ MSE cao $\implies$ có bất thường! |
+| **CE** | *Cross-Entropy Loss* ($\mathcal{L}_{\text{CE}}$) | Hàm mất mát Entropy chéo | Đo xem **Classifier đoán 12 lớp sai lệch bao nhiêu** so với nhãn mục tiêu. Đoán càng đúng lớp thì CE càng nhỏ (tiến về 0). |
+| **Softmax** | *Softmax Activation* | Hàm chuẩn hóa xác suất | Biến 12 điểm số thô ở đầu ra của Classifier thành **12 con số xác suất cộng lại đúng bằng 100% (1.0)**. |
 
-### 1.4. Phân biệt Mô hình (Encoder/Decoder/Classifier) và Không gian ẩn (`Embedding`)
-* **Encoder, Decoder, Classifier:** Là các khối **mạng nơ-ron (Mô hình)** chứa các tầng tích chập (1D-CNN) hoặc tầng tuyến tính (MLP) có trọng số học được.
-* **Embedding (Vector biểu diễn ẩn):** **Không phải là mô hình** và cũng không phải hàm chuyển chữ thành số. Khi đưa đoạn sóng thô kích thước $D \times 100$ đi qua bộ mã hóa **Encoder**, Encoder sẽ "ép" đoạn sóng đó thành một dãy gồm đúng **128 con số thực** (`shape: (128,)`). Dãy 128 con số tóm tắt toàn bộ tinh túy/triệu chứng của đoạn sóng này chính là **Embedding**.
-* Từ cùng một "tờ phiếu tóm tắt" Embedding 128 số này:
-  1. Đưa lên **Classifier ("Bác sĩ chẩn đoán"):** Đoán xem đoạn sóng thuộc loại nào trong 12 lớp.
-  2. Đưa xuống **Decoder ("Họa sĩ phục chế"):** Vẽ khôi phục lại đoạn sóng bình thường kích thước $D \times 100$.
+### 1.3. Các thuật ngữ Đánh giá Kết quả (Metrics) & Phân tích
+| Viết tắt | Tiếng Anh đầy đủ | Nghĩa Tiếng Việt | Giải thích bình dân trong 1 câu |
+| :--- | :--- | :--- | :--- |
+| **FPR** | *False Positive Rate* | Tỷ lệ Dương tính giả (**Báo động giả**) | Máy đang chạy bình thường nhưng AI lại hú còi báo lỗi. |
+| **FNR** | *False Negative Rate* | Tỷ lệ Âm tính giả (**Bỏ sót lỗi**) | Máy đang bị hỏng thật nhưng AI lại im lặng bảo bình thường. |
+| **ROC / PR** | *Receiver Operating Characteristic / Precision-Recall* | Đường cong ROC và Đường cong Độ chính xác - Độ phủ | Hai biểu đồ chuẩn để đo chất lượng bộ phát hiện lỗi mà không phụ thuộc vào việc chọn ngưỡng cắt cố định. Khi lỗi rất hiếm (như trong chuỗi thời gian), **PR** đánh giá khắt khe và chuẩn xác hơn **ROC**. |
+| **R-AUC-ROC / R-AUC-PR** | *Range Area Under the Curve* | Diện tích dưới đường cong tính theo khoảng (Range) | Phiên bản nâng cấp của AUC dành riêng cho chuỗi thời gian: tính điểm theo **cả một đoạn thời gian bị lỗi** (có vùng đệm xung quanh) thay vì chỉ chấm từng giây rời rạc. |
+| **VUS-ROC / VUS-PR** | *Volume Under the Surface* | Thể tích dưới bề mặt (Thước đo chuẩn nhất KDD '25) | Thay vì chọn cố định 1 độ dài vùng đệm, VUS quét qua nhiều vùng đệm khác nhau để tạo thành mặt 3D rồi tính thể tích. **Số càng gần `1.0` là mô hình càng xuất sắc.** |
+| **RF** | *Range F-score* | Điểm cân bằng F1 theo khoảng thời gian | Điểm trung bình điều hòa giữa Precision (báo động có chuẩn không) và Recall (có bắt hết các đoạn lỗi không). |
+| **t-SNE / PCA** | *t-Distributed Stochastic Neighbor Embedding / Principal Component Analysis* | Thuật toán giảm chiều dữ liệu (từ 128D xuống 2D) | Con người không thể nhìn được không gian 128 chiều (128 con số của Embedding), nên ta dùng PCA hoặc t-SNE để "ép phẳng" 128 chiều xuống mặt phẳng 2D ($x, y$) để vẽ biểu đồ chấm điểm. |
+| **XAI** | *Explainable Artificial Intelligence* | AI có khả năng giải thích | Không chỉ phán "Có lỗi!", AI còn giải thích được **"Lỗi này có hình dạng giống lỗi nhiễu sóng (Noise) hay lỗi kẹt cảm biến (Cutoff)"**. |
 
-### 1.5. Tập mặt nạ bất thường (`Anomaly Mask` - $W$)
-* **Bản chất:** Là một ma trận nhị phân chỉ gồm số `0` và `1` có cùng kích thước $D \times L$ với cửa sổ dữ liệu, do **thuật toán tăng cường dữ liệu tự tạo ra** khi chèn lỗi giả.
-  * `W = 1`: Đánh dấu đúng tọa độ vừa bị chèn bất thường giả vào.
-  * `W = 0`: Đánh dấu vùng dữ liệu gốc bình thường không bị chạm tới.
-* **Tác dụng cốt lõi:** Dùng trong hàm mất mát tái tạo $\mathcal{L}_{\text{MSE}}$ thông qua phép nhân với $(1 - W)$. Những chỗ có lỗi giả ($W = 1 \implies 1 - W = 0$) sẽ bị nhân với `0` để **che mắt nhánh Decoder**, ngăn không cho Decoder học cách vẽ lại các cục lỗi giả. Nhờ đó, Decoder chỉ học cách vẽ dữ liệu bình thường; khi gặp lỗi thật ở tập Test, nó sẽ vẽ sai lệch lớn và phát hiện được bất thường.
-
-### 1.6. Hiện tượng "Bệnh giả vô hại" (`False Anomaly`) và Lý do cần Nhãn mềm + FAA
-* Khi thuật toán cắt ghép ngẫu nhiên (ví dụ phép `Cutoff` hoặc `Average` rơi vào đoạn quá ngắn chỉ 1-2 điểm như `[70, 72, 71, 71, 72, 71]` so với gốc `[70, 72, 71, 70, 72, 71]`, hoặc làm mượt trên chuỗi có chu kỳ quá dài), mẫu sinh ra **mang tiếng là "Bất thường giả" nhưng thực chất nhìn chẳng khác gì "Bình thường"**. Bài báo gọi đây là **False Anomaly**.
-* Nếu ép mô hình học nhãn cứng `100% Bất thường` cho các mẫu này, mô hình sẽ bị rối loạn và báo động giả liên tục. REDLAMP giải quyết bằng 2 chốt chặn:
-  1. **Lúc Huấn luyện — Nhãn mềm (`Backward Correction`):** Không bao giờ tin 100% vào nhãn. Luôn chừa lại xác suất $\alpha = 0.1$ ($10\%$) rằng mẫu bất thường giả thực chất vẫn là mẫu bình thường, và $\beta = 0.01$ ($1\%$) xác suất nhầm lẫn giữa các lớp.
-  2. **Lúc Kiểm thử — Bộ lọc `FAA` (`Frequent Anomaly Adjustment`):** Nếu một lớp bất thường giả nào đó tạo ra toàn mẫu giống bình thường (trở thành *Pseudo-normal class*), thì khi chạy trên tập Test, AI sẽ dự đoán lớp đó xuất hiện suốt ngày (vượt quá ngưỡng $\delta = 5\%$ toàn thời gian). Bộ lọc FAA sẽ tự động coi lớp xuất hiện quá nhiều đó là bình thường và **gạch điểm của lớp đó về 0**.
-
----
-
-## PHẦN 2: ĐỘNG LỰC NGHIÊN CỨU & 3 GIẢ ĐỊNH CỐT LÕI (INTRODUCTION)
-
-Bài báo đặt nền móng bằng việc so sánh 3 giả định trong Phát hiện bất thường chuỗi thời gian không giám sát (Unsupervised TSAD - minh họa tại **Figure 1**):
-
-1. **Giả định Bình thường (*Normality Assumption* - Autoencoder, VAE, GAN, Anomaly Transformer, Diffusion):**
-   * Giả định toàn bộ tập Train đều là bình thường.
-   * **Điểm yếu:** Trong thực tế, tập Train luôn bị lẫn các điểm lỗi chưa gán nhãn (**Nhiễm bẩn bất thường - Anomaly Contamination**). Mô hình sẽ học cách tái tạo luôn cả các lỗi nhiễm bẩn này $\implies$ Khái quát hóa quá mức (*Overgeneralization*), bỏ sót lỗi thật (*False Negative cao*).
-2. **Giả định Bất thường Nhị phân (*Binary Anomaly Assumption* - NCAD, COUTA, CutAddPaste):**
-   * Tạo bất thường giả bằng Data Augmentation rồi dạy mô hình phân loại nhị phân (`0: Normal`, `1: Anomaly`).
-   * **3 Điểm yếu chí mạng:**
-     1. **Khoảng trống đa dạng (*Diversity Gap*):** Một vài phép biến đổi không thể bao phủ hết các kiểu bất thường thực tế, để lại khoảng trống khiến mô hình vẫn bị tổn thương bởi nhiễm bẩn.
-     2. **Bất thường giả sai lệch (*False Anomaly*):** Sinh ra các mẫu biến đổi nhưng trông vẫn bình thường, gây Overfitting và báo động giả (*False Positive cao*).
-     3. **Tự tin thái quá vào nhãn (*Overconfidence on Labels*):** Dùng nhãn cứng nhị phân `0/1` tuyệt đối, không tính đến dữ liệu bẩn và False Anomaly.
-3. **Giả định Bất thường Đa lớp (*Multiclass Anomaly Assumption* - Đề xuất bởi REDLAMP):**
-   * Dùng **$K = 12$ lớp** (1 lớp Normal + 11 lớp bất thường giả chuyên biệt cho chuỗi thời gian) để lấp đầy *Diversity Gap*, kết hợp phân loại đa lớp bằng **Nhãn mềm (Soft Labels)** và **Tái tạo có mặt nạ (Masked Reconstruction)**.
+### 1.4. Tên 5 Bộ dữ liệu Chuẩn trong Bài báo
+* **UCR (*UCR Anomaly Archive*):** Gồm 250 chuỗi đơn biến ($D=1$ cảm biến) từ y tế (điện tâm đồ ECG, huyết áp ABP), nông nghiệp (côn trùng EPG), công nghiệp... Tập Train hoàn toàn sạch (0% lỗi).
+* **AIOps:** Gồm 29 chuỗi đơn biến ($D=1$) theo dõi chỉ số vận hành máy chủ Web đám mây (Cloud KPIs). Tập Train bị lẫn khoảng 2.49% lỗi.
+* **SMD (*Server Machine Dataset*):** Gồm 28 máy chủ, mỗi máy chủ theo dõi cùng lúc **$D=38$ chỉ số** (CPU, RAM, Disk, Network...) suốt 5 tuần.
+* **SMAP & MSL (*NASA Spacecraft Datasets*):** Dữ liệu thực tế từ Vệ tinh đo độ ẩm đất (**SMAP**) và Tàu tự hành Sao Hỏa (**MSL**) của NASA, theo dõi từ 25 đến 55 kênh cảm biến và bộ truyền động.
 
 ---
 
-## PHẦN 3: PHƯƠNG PHÁP LUẬN & HỆ THỐNG CÔNG THỨC TOÁN HỌC (METHODOLOGY)
+## PHẦN 2: CÁCH ĐỌC CÁC KÝ HIỆU TOÁN HỌC TRONG BÀI BÁO (KHÔNG SỢ CÔNG THỨC!)
 
-### 3.1. Định nghĩa Bài toán (Section 3.1)
-* Cho chuỗi thời gian đa biến $X = \{x_1, x_2, \dots, x_T\} \in \mathbb{R}^{D \times T}$ với $D$ đặc trưng và $T$ bước thời gian.
-* Dùng cửa sổ trượt kích thước $L = 100$ cắt thành tập huấn luyện $X^{\text{train}} = \{X^{(L)}, X^{(L+1)}, \dots, X^{(T)}\}$, trong đó mỗi cửa sổ thứ $t$ là:
-  $$X^{(t)} = \{x_{t-L+1}, \dots, x_t\} \in \mathbb{R}^{D \times L}$$
-* Mục tiêu: Dự đoán điểm bất thường $s(t)$ cho mỗi cửa sổ $X^{(t)} \in X^{\text{test}}$ (điểm càng cao càng bất thường).
+Trước khi đọc công thức (1) đến (8), bạn chỉ cần nắm **6 quy tắc ký hiệu** cực kỳ đơn giản sau:
 
-### 3.2. Thuật toán Tăng cường Dữ liệu 12 Lớp (Section 3.3 & Algorithm 1)
-Với mỗi mẫu $X^{(t)} \in \mathbb{R}^{D \times L}$, thuật toán áp dụng lần lượt $K = 12$ phép biến đổi $f^{(k)}$ ($k = 1 \dots 12$) để tạo ra bộ ba:
-* Mẫu tăng cường: $X^{(t,k)} \in \mathbb{R}^{D \times L}$ (tỷ lệ số mẫu mỗi lớp là $1:1$ so với tập Train gốc, tức dữ liệu tăng gấp 12 lần).
-* Nhãn cứng One-hot: $y^{(t,k)} \in \{0, 1\}^K$ với phần tử thứ $k$ bằng $1$ ($y_k^{(t,k)} = 1$).
-* Mặt nạ bất thường: $W^{(t,k)} \in \{0, 1\}^{D \times L}$.
+1. **Chữ in hoa ($X, W$) vs. Chữ thường ($x, y, s$):**
+   * Chữ in hoa như $X^{(t)}$ là một **bảng số (ma trận)** chứa cả một đoạn cửa sổ thời gian.
+   * Chữ thường như $s(t)$ là **một con số điểm** hoặc một danh sách ngắn (vector).
+2. **Dấu mũ nón ($\hat{X}, \hat{y}$) vs. Dấu ngã ($\tilde{y}$) vs. Không dấu ($X, y$):**
+   * **Không dấu ($X, y$):** Dữ liệu gốc ban đầu / Nhãn gốc ban đầu.
+   * **Có dấu mũ nón ($\hat{X}, \hat{y}$ — đọc là "X-hat", "y-hat"):** Kết quả **do mạng AI dự đoán ra**. (Cứ thấy dấu `^` trên đầu nghĩa là sản phẩm của AI!).
+   * **Có dấu ngã ($\tilde{y}$ — đọc là "y-tilde"):** Nhãn đã được **làm mềm** (chỉnh sửa nhẹ từ nhãn gốc $y$).
+3. **Ký hiệu $\in \mathbb{R}^{D \times L}$ (đọc là "thuộc không gian số thực kích thước D nhân L"):**
+   * Đừng bận tâm chữ $\mathbb{R}$, nó chỉ có nghĩa là **một bảng Excel có $D$ hàng (số cảm biến) và $L$ cột (số mốc thời gian)**. Ví dụ $D=1, L=100$ nghĩa là một dãy gồm đúng 100 con số liên tiếp.
+4. **Ký hiệu $\odot$ hoặc $\circ$ (Phép nhân Hadamard / Element-wise):**
+   * Nghĩa là **nhân từng vị trí tương ứng với nhau**.
+   * *Ví dụ:* $[2, 5, 8] \odot [1, 0, 1] = [2\times 1, \; 5\times 0, \; 8\times 1] = [2, 0, 8]$.
+5. **Ký hiệu $\| A \|_2^2$ (Chuẩn bình phương L2):**
+   * Nghĩa là **lấy từng con số trong bảng $A$ bình phương lên (nhân chính nó) rồi cộng tất cả lại**.
+   * *Ví dụ:* $\| [3, -2, 1] \|_2^2 = 3^2 + (-2)^2 + 1^2 = 9 + 4 + 1 = 14$. (Bình phương giúp mọi số âm đều thành số dương và phạt nặng những chỗ lệch lớn).
+6. **Ký hiệu $a \sim \mathcal{N}(\mu, \sigma^2)$ (Bốc số ngẫu nhiên theo Phân phối chuẩn hình chuông):**
+   * Nghĩa là máy tính bốc ngẫu nhiên một con số $a$ xoay quanh tâm trung bình $\mu$ với phương sai $\sigma^2$ (độ lệch chuẩn $\sigma$).
+   * **Lưu ý quan trọng:** $\sigma = 1$ **không phải là giới hạn chặn cứng** ở $[-1, +1]$, mà là độ lệch trung bình theo quy tắc hình quả chuông (**Quy tắc 68–95–99.7**). Hãy hình dung tổng diện tích bên dưới quả chuông là **100 viên bi (100%)** được rải xuống:
+     * Vì **bụng chuông ở giữa (`-1` đến `+1`) phình cao nhất**, nó chứa được nhiều bi nhất: mỗi nửa bên trái/phải chứa `34.1%` $\implies$ Cộng lại `34.1% + 34.1% = 68.2%` (~68 viên bi rơi vào `[-1, +1]`).
+     * Hai **sườn chuông (`-2` đến `-1` và `+1` đến `+2`)** thấp dần xuống, mỗi bên chứa thêm `13.6%` $\implies$ Cộng dồn từ `-2` đến `+2` là: `13.6% + 68.2% + 13.6% = 95.4%` (~95 viên bi rơi vào `[-2, +2]`).
+     * Hai **đuôi chuông ngoài cùng (`-3` đến `-2` và `+2` đến `+3`)** dẹt sát mặt đất, mỗi bên chỉ chứa `2.1%` $\implies$ Cộng dồn từ `-3` đến `+3` là `99.7%`.
 
-**Quy trình ngẫu nhiên hóa trong Algorithm 1 (cho $k = 2 \dots 12$):**
-1. Chọn ngẫu nhiên một tập con các chiều đặc trưng $\text{dims} \subseteq \{1, \dots, D\}$.
-2. Với mỗi chiều $\text{dim} \in \text{dims}$, chọn ngẫu nhiên 2 mốc thời gian trong cửa sổ và sắp xếp tăng dần: $\text{st}, \text{ed} = \text{Sort}(\text{Uni}(\{1, \dots, L\}, 2))$, độ dài đoạn biến đổi $\text{length} = \text{ed} - \text{st}$.
-
-**Công thức toán học của 12 phép biến đổi (Section 3.3.2):**
-1. **(1) Normal ($k=1$):** Giữ nguyên dữ liệu gốc:
-   $$X_{\text{dim}}^{(t,1)} = X_{\text{dim}}^{(t)}, \quad W^{(t,1)} = 0$$
-2. **(2) Spike ($k=2$):** Cộng một gai nhọn đột biến tại đúng 1 điểm $\text{st}$:
-   $$X_{\text{dim}, \text{st}}^{(t,k)} = X_{\text{dim}, \text{st}}^{(t)} + a, \quad a \sim \mathcal{N}(0, 1), \quad W_{\text{dim}, \text{st}}^{(t,k)} = 1$$
-3. **(3) Flip ($k=3$):** Lật ngược đoạn dữ liệu theo chiều ngang (thời gian):
-   $$X_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = X_{\text{dim}, \text{st}:\text{ed}}^{(t)}[::-1], \quad W_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = 1$$
-4. **(4) Speedup ($k=4$):** Thay đổi tần số (tua nhanh gấp đôi $2\times$ hoặc kéo giãn chậm đi $1/2\times$):
-   $$X_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = \begin{cases} X_{\text{dim}, \text{st}:\text{ed}+\text{length}}^{(t)}[::2], & \text{if } 2\times \\ \text{Stretch}\left(X_{\text{dim}, \text{st}:\text{ed}-(\text{length}/2)}^{(t)} : [\text{length}/2] \to [\text{length}]\right), & \text{if } 1/2\times \end{cases}, \quad W_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = 1$$
-5. **(5) Noise ($k=5$):** Cộng nhiễu Gaussian vào đoạn $\text{st}:\text{ed}$:
-   $$X_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = X_{\text{dim}, \text{st}:\text{ed}}^{(t)} + a, \quad a \sim \mathcal{N}(0, 0.1I), \quad W_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = 1$$
-6. **(6) Cutoff ($k=6$):** Thay cả đoạn bằng một hằng số ngẫu nhiên nằm giữa min và max của đoạn đó:
-   $$X_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = \text{Uni}\left(\left\{\min(X_{\text{dim}, \text{st}:\text{ed}}^{(t)}), \dots, \max(X_{\text{dim}, \text{st}:\text{ed}}^{(t)})\right\}, 1\right), \quad W_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = 1$$
-7. **(7) Average ($k=7$):** Làm mượt bằng trung bình trượt với cửa sổ $w = L/5 = 20$:
-   $$X_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = \text{MovingAverage}\left(X_{\text{dim}, \text{st}:\text{ed}}^{(t)}, w = L/5\right), \quad W_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = 1$$
-8. **(8) Scale ($k=8$):** Nhân biên độ đoạn $\text{st}:\text{ed}$ với hệ số ngẫu nhiên:
-   $$X_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = a \cdot X_{\text{dim}, \text{st}:\text{ed}}^{(t)}, \quad a \sim \mathcal{N}(1, 1), \quad W_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = 1$$
-9. **(9) Wander ($k=9$):** Cộng xu hướng tuyến tính vào đoạn $\text{st}:\text{ed}$ và làm lệch toàn bộ đường cơ sở từ $\text{ed}$ đến cuối cửa sổ (mặt nạ $W$ bật bằng $1$ từ $\text{st}$ đến hết cửa sổ $L$):
-   $$X_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = X_{\text{dim}, \text{st}:\text{ed}}^{(t)} + \text{np.linspace}(0, a, \text{length}), \quad X_{\text{dim}, \text{ed}:}^{(t,k)} \mathrel{+}= a, \quad a \sim \mathcal{N}(0, 1), \quad W_{\text{dim}, \text{st}:}^{(t,k)} = 1$$
-10. **(10) Contextual ($k=10$):** Vừa nhân biên độ vừa cộng độ lệch nền:
-    $$X_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = a \cdot X_{\text{dim}, \text{st}:\text{ed}}^{(t)} + b, \quad a \sim \mathcal{N}(1, 1), b \sim \mathcal{N}(0, 1), \quad W_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = 1$$
-11. **(11) Upsidedown ($k=11$):** Lật ngược đồ thị theo chiều dọc qua giá trị trung bình của đoạn:
-    $$X_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = 2 \cdot \text{Mean}(X_{\text{dim}, \text{st}:\text{ed}}^{(t)}) - X_{\text{dim}, \text{st}:\text{ed}}^{(t)}, \quad W_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = 1$$
-12. **(12) Mixture ($k=12$):** Tráo đổi đoạn $\text{st}:\text{ed}$ với một đoạn cùng độ dài từ cửa sổ ở thời điểm $t'$ khác:
-    $$X_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = X_{\text{dim}, \text{st}:\text{ed}}^{(t')}, \quad t' \in \{L, \dots, T\}, \quad W_{\text{dim}, \text{st}:\text{ed}}^{(t,k)} = 1$$
-
-### 3.3. Làm mới Nhãn & Hiệu chỉnh Ngược (Label Refurbishment — Công thức 1)
-Chuyển đổi nhãn cứng one-hot $y^{(t,k)}$ thành nhãn mềm $\tilde{y}^{(t,k)}$ cho từng phần tử thứ $i \in \{1, \dots, K\}$:
-$$\tilde{y}_i^{(t,k)} = \begin{cases} (1 - \alpha - K\beta)y_i^{(t,k)} + \alpha + \beta, & \text{if } i = 1 \text{ (vị trí lớp Normal)}, \\ (1 - \alpha - K\beta)y_i^{(t,k)} + \beta, & \text{otherwise (vị trí các lớp Anomaly } i = 2 \dots K\text{)}, \end{cases} \quad (1)$$
-* Với thiết lập mặc định $K = 12, \alpha = 0.1, \beta = 0.01 \implies 1 - \alpha - K\beta = 0.78$:
-  * **Nếu mẫu thuộc lớp Normal ($k=1$):** Vector nhãn mềm là $[0.89, 0.01, 0.01, \dots, 0.01]$.
-  * **Nếu mẫu thuộc lớp Anomaly (ví dụ $k=2$):** Vector nhãn mềm là $[0.11, 0.79, 0.01, \dots, 0.01]$ (tức luôn có $11\%$ xác suất mẫu biến đổi này thực chất vẫn là Normal).
-
-### 3.4. Hàm Mục tiêu Huấn luyện (Objective Function — Công thức 2, 3, 4)
-1. **Hàm mất mát tái tạo có mặt nạ (Masked Reconstruction Loss):**
-   $$\mathcal{L}_{\text{MSE}} = \left\| (1 - W^{(t,k)}) \odot (X^{(t,k)} - \hat{X}^{(t,k)}) \right\|_2^2 \quad (2)$$
-2. **Hàm mất mát phân loại đa lớp nhãn mềm (Cross-Entropy Loss):**
-   $$\mathcal{L}_{\text{CE}} = -\sum_{i=1}^{K} \tilde{y}_i^{(t,k)} \log(\hat{y}_i^{(t,k)}) \quad (3)$$
-3. **Hàm mất mát tổng hợp (Total Loss — với $\gamma = 0.1$):**
-   $$\mathcal{L} = \gamma \mathcal{L}_{\text{CE}} + (1 - \gamma) \mathcal{L}_{\text{MSE}} \quad (4)$$
-
-### 3.5. Chấm điểm Bất thường lúc Kiểm thử (Anomaly Scoring — Công thức 5, 6, 7, 8)
-Khi đưa mẫu kiểm thử $X^{(t)} \in X^{\text{test}}$ vào mô hình:
-1. **Điểm sai số tái tạo:**
-   $$s_{\text{MSE}}(t) = \left\| X^{(t)} - \hat{X}^{(t)} \right\|_2^2 \quad (5)$$
-2. **Hàm điều chỉnh bất thường thường xuyên (Frequent Anomaly Adjustment - FAA):** Loại bỏ các lớp giả bình thường (*pseudo-normal classes*) nếu xác suất dự đoán trung bình của lớp $i$ trên toàn bộ tập Test vượt quá $\delta = 0.05$:
-   $$\text{FAA}(\hat{y}_i^{(t)}) = \begin{cases} 0, & \text{if } \frac{1}{|X^{\text{test}}|} \sum_{X^{(t')} \in X^{\text{test}}} \hat{y}_i^{(t')} > \delta, \\ \hat{y}_i^{(t)}, & \text{otherwise}, \end{cases} \quad (6)$$
-3. **Điểm lớp bất thường đã điều chỉnh (tổng từ lớp $i = 2$ đến $K$):**
-   $$s_{\text{CE}}(t) = \sum_{i=2}^{K} \text{FAA}(\hat{y}_i^{(t)}) \quad (7)$$
-4. **Điểm bất thường tổng hợp (chuẩn hóa Min-Max trên toàn chuỗi Test rồi lấy trung bình):**
-   $$s(t) = \frac{1}{2} \text{MinMax}_T(s_{\text{MSE}}(t)) + \frac{1}{2} \text{MinMax}_T(s_{\text{CE}}(t)) \quad (8)$$
-   *(Hậu xử lý: Áp dụng thêm bộ lọc trung bình trượt Moving Average có độ dài $L/2 = 50$ bước thời gian lên $s(t)$ để làm mượt chuỗi điểm).*
-
----
-
-## PHẦN 4: THÔNG SỐ BỘ DỮ LIỆU, SIÊU THAM SỐ & KẾT QUẢ THỰC NGHIỆM
-
-### 4.1. Thống kê 5 Bộ dữ liệu Thực nghiệm (Table 2 & Appendix A)
-
-| Thông số | UCR | AIOps | SMD | SMAP | MSL |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Số tập dữ liệu con (`# Subdatasets`)** | 250 | 29 | 28 | 50 | 23 |
-| **Số chiều đặc trưng ($D$)** | 1 (Đơn biến) | 1 (Đơn biến) | 38 (Đa biến) | 55 (Đa biến) | 25 (Đa biến) |
-| **Lĩnh vực** | Đa dạng (9 nhóm) | Cloud KPIs | Server Machine | Tàu vũ trụ NASA | Tàu Sao Hỏa |
-| **Độ dài chuỗi Train TB ($T_{\text{train}}$)** | 30,522 | 103,588 | 25,300 | 2,752 | 2,410 |
-| **Tỷ lệ nhiễm bẩn tập Train (%)** | 0.00% | 2.49% | Không rõ | Không rõ | Không rõ |
-| **Độ dài chuỗi Test TB ($T_{\text{test}}$)** | 56,173 | 100,649 | 25,300 | 8,203 | 2,923 |
-| **Tỷ lệ điểm bất thường tập Test (%)** | 0.85% | 1.81% | 4.21% | 12.61% | 13.01% |
-| **Bước nhảy cửa sổ Train (`Stride`)** | $\{1, 10, 100\}$ (để $<10,000$ mẫu) | 10 | 10 | 10 | 10 |
-| **Cách chạy tập con** | Tách riêng (5 runs) | Tách riêng (5 runs) | Tách riêng (5 runs) | Gộp chung | Gộp chung |
-
-### 4.2. Bảng Siêu tham số Cố định của REDLAMP (Table 4 & Appendix C)
-* **Kiến trúc Encoder:** 4 khối `ConvBlock1D` với số filters `[128, 128, 256, 256]`, `stride = 2`, `BatchNorm1d`, `ReLU`, `Dropout = 0.2` $\to$ `MaxPool1d` $\to$ `Conv1d` ánh xạ về chiều không gian ẩn **`Encoder embedding dim = 128`**.
-* **Kiến trúc Decoder:** Đối xứng với Encoder (`Linear` upsampling $\to$ 4 khối `ConvBlock1D` $\to$ `Conv1d` trả về kích thước `(D, 100)`).
-* **Kiến trúc Classifier:** MLP 2 tầng (`Linear(128 -> 32)` $\to$ `BatchNorm1d` $\to$ `ReLU` $\to$ `Dropout(0.2)` $\to$ `Linear(32 -> 12)` $\to$ `Softmax`).
-* **Huấn luyện:** Optimizer `AdamW` (`lr = 1e-3`), `batch_size = 128`, `window_size L = 100`, tối đa `100 epochs` (Early stopping với 10% Validation).
-* **Tham số REDLAMP:** $K = 12, \alpha = 0.1, \beta = 0.01, \gamma = 0.1, \delta = 0.05$.
-
-### 4.3. Tóm tắt Kết quả Chính (Section 4.2 – 4.6)
-* **Hiệu năng (Q1):** Đứng số 1 trung bình trên cả 5 bộ dữ liệu với **VUS-ROC = 0.803**, **VUS-PR = 0.430** (vượt phương pháp thứ hai CutAddPaste tới **+17.4%**), **Range F-score = 0.219** (+14.6%) và độ chính xác phát hiện trên UCR đạt **62.0%**.
-* **Nghiên cứu cắt bỏ thành phần (Q2 - Ablation Study):** Cắt bỏ bất kỳ thành phần nào (`w/o AM`, `w/o BC`, `w/o L_MSE`, `w/o L_CE`, `w/o FAA` hoặc chuyển về `Binary`) đều làm giảm hiệu năng đáng kể. Đặc biệt nếu gộp 11 loại lỗi về phân loại nhị phân (`Binary`), VUS-PR giảm tới **15.6% trên UCR** và **24.3% trên SMD**.
-* **Kháng nhiễm bẩn (Q4 - Robustness):** Khi trộn 5% bất thường vào tập Train của UCR, REDLAMP chỉ giảm nhẹ **1.8%** VUS-PR, trong khi CutAddPaste sụt giảm tới **15.5%** và các mô hình tái tạo thuần túy (AT, BeatGAN) suy giảm nghiêm trọng.
-* **Khả năng giải thích (Q5 - Explainability):** Vẽ biểu đồ t-SNE 2D của các vector `Embedding` 128 chiều giúp nhìn thấy rõ các điểm lỗi thực tế trong tập Test nằm sát cụm lớp bệnh giả nào (ví dụ: lỗi chu kỳ của UCR #040 EPG nằm sát cụm `Speedup`; lỗi nhiễu đỉnh sóng UCR #028 ABP nằm sát cụm `Noise`; lỗi máy chủ SMD Machine 1-1 nằm gần `Spike` và `Cutoff`).
-
----
-
-## PHẦN 5: MÃ NGUỒN PYTORCH TÁI LẬP ĐẦY ĐỦ & KỊCH BẢN MÔ PHỎNG TRỰC QUAN
-
-Dưới đây là mã nguồn Python/PyTorch hoàn chỉnh chứa toàn bộ lõi thuật toán của REDLAMP và hàm chạy thử nghiệm mô phỏng để bạn có thể chạy kiểm tra ngay trên máy tính:
-
-```python
-import numpy as np
-import torch
-import torch.nn as nn
-
-# =====================================================================
-# 1. THUẬT TOÁN TĂNG CƯỜNG DỮ LIỆU 12 LỚP & TẠO MẶT NẠ W (ALGORITHM 1)
-# =====================================================================
-def augment_instance(x_window, all_windows=None):
-    """
-    Đầu vào: x_window có kích thước (D, L) với L = 100
-    Đầu ra:
-      - X_aug: (12, D, L) - 12 phiên bản của cửa sổ (1 Normal + 11 Anomaly)
-      - y_aug: (12, 12)   - Nhãn cứng One-hot cho 12 lớp
-      - W_aug: (12, D, L) - Mặt nạ nhị phân đánh dấu vị trí chèn lỗi (1 = lỗi, 0 = bình thường)
-    """
-    D, L = x_window.shape
-    K = 12
-    X_aug = np.zeros((K, D, L), dtype=np.float32)
-    y_aug = np.eye(K, dtype=np.float32)
-    W_aug = np.zeros((K, D, L), dtype=np.float32)
-
-    for k in range(K):
-        x_new = x_window.copy()
-        w_mask = np.zeros((D, L), dtype=np.float32)
-        
-        if k == 0:  # Lớp 1: Normal (Giữ nguyên)
-            X_aug[k] = x_new
-            continue
-            
-        num_dims = np.random.randint(1, D + 1)
-        dims = np.random.choice(D, size=num_dims, replace=False)
-        
-        for dim in dims:
-            pts = np.sort(np.random.choice(np.arange(0, L), size=2, replace=False))
-            st, ed = int(pts[0]), int(pts[1])
-            if ed - st < 2:
-                ed = min(L, st + 2)
-            length = ed - st
-            seg = x_new[dim, st:ed].copy()
-
-            if k == 1:    # (2) Spike
-                x_new[dim, st] += np.random.normal(0, 1.0)
-                w_mask[dim, st] = 1.0
-            elif k == 2:  # (3) Flip
-                x_new[dim, st:ed] = seg[::-1]
-                w_mask[dim, st:ed] = 1.0
-            elif k == 3:  # (4) Speedup (2x hoặc 0.5x)
-                if np.random.rand() < 0.5 and st + 2 * length <= L:
-                    x_new[dim, st:ed] = x_window[dim, st:st + 2 * length:2][:length]
-                else:
-                    half_len = max(1, length // 2)
-                    x_new[dim, st:ed] = np.interp(
-                        np.linspace(0, half_len - 1, length),
-                        np.arange(half_len), seg[:half_len]
-                    )
-                w_mask[dim, st:ed] = 1.0
-            elif k == 4:  # (5) Noise
-                x_new[dim, st:ed] += np.random.normal(0, np.sqrt(0.1), size=length)
-                w_mask[dim, st:ed] = 1.0
-            elif k == 5:  # (6) Cutoff
-                val = np.random.uniform(np.min(seg), np.max(seg) + 1e-6)
-                x_new[dim, st:ed] = val
-                w_mask[dim, st:ed] = 1.0
-            elif k == 6:  # (7) Average (Moving average w = L/5)
-                w_size = max(1, L // 5)
-                kernel = np.ones(w_size) / w_size
-                x_new[dim, st:ed] = np.convolve(seg, kernel, mode='same')
-                w_mask[dim, st:ed] = 1.0
-            elif k == 7:  # (8) Scale
-                a = np.random.normal(1.0, 1.0)
-                x_new[dim, st:ed] = a * seg
-                w_mask[dim, st:ed] = 1.0
-            elif k == 8:  # (9) Wander
-                a = np.random.normal(0.0, 1.0)
-                x_new[dim, st:ed] += np.linspace(0, a, length)
-                x_new[dim, ed:] += a
-                w_mask[dim, st:] = 1.0
-            elif k == 9:  # (10) Contextual
-                a, b = np.random.normal(1.0, 1.0), np.random.normal(0.0, 1.0)
-                x_new[dim, st:ed] = a * seg + b
-                w_mask[dim, st:ed] = 1.0
-            elif k == 10: # (11) Upsidedown
-                x_new[dim, st:ed] = 2.0 * np.mean(seg) - seg
-                w_mask[dim, st:ed] = 1.0
-            elif k == 11: # (12) Mixture
-                if all_windows is not None and len(all_windows) > 1:
-                    rand_idx = np.random.randint(0, len(all_windows))
-                    x_new[dim, st:ed] = all_windows[rand_idx][dim, st:ed]
-                w_mask[dim, st:ed] = 1.0
-
-        X_aug[k] = x_new
-        W_aug[k] = w_mask
-    return X_aug, y_aug, W_aug
-
-# =====================================================================
-# 2. HIỆU CHỈNH NHÃN MỀM (BACKWARD CORRECTION - CÔNG THỨC 1)
-# =====================================================================
-def backward_correction(y_onehot, alpha=0.1, beta=0.01, K=12):
-    y_tilde = (1.0 - alpha - K * beta) * y_onehot + beta
-    y_tilde[:, 0] += alpha  # Cộng thêm alpha vào cột đầu tiên (Lớp Normal k=1)
-    return y_tilde
-
-# =====================================================================
-# 3. KIẾN TRÚC MẠNG REDLAMP (ENCODER -> EMBEDDING -> DECODER & CLASSIFIER)
-# =====================================================================
-class ConvBlock1D(nn.Module):
-    def __init__(self, in_c, out_c, stride=2, dropout=0.2):
-        super().__init__()
-        self.block = nn.Sequential(
-            nn.Conv1d(in_c, out_c, kernel_size=3, stride=stride, padding=1),
-            nn.BatchNorm1d(out_c),
-            nn.ReLU(),
-            nn.Dropout(dropout)
-        )
-    def forward(self, x):
-        return self.block(x)
-
-class REDLAMP(nn.Module):
-    def __init__(self, in_features, window_size=100, K=12, emb_dim=128, cls_dim=32):
-        super().__init__()
-        self.in_features = in_features
-        self.window_size = window_size
-        
-        # Khối Encoder nén dữ liệu về Embedding 128 chiều
-        self.enc_blocks = nn.Sequential(
-            ConvBlock1D(in_features, 128, stride=2, dropout=0.2),
-            ConvBlock1D(128, 128, stride=2, dropout=0.2),
-            ConvBlock1D(128, 256, stride=2, dropout=0.2),
-            ConvBlock1D(256, 256, stride=2, dropout=0.2),
-            nn.MaxPool1d(kernel_size=2, stride=2),
-            nn.Conv1d(256, emb_dim, kernel_size=1)
-        )
-        self.adaptive_pool = nn.AdaptiveAvgPool1d(1)
-        
-        # Nhánh 1: Classifier ("Bác sĩ chẩn đoán" 12 lớp)
-        self.classifier = nn.Sequential(
-            nn.Linear(emb_dim, cls_dim),
-            nn.BatchNorm1d(cls_dim),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(cls_dim, K),
-            nn.Softmax(dim=-1)
-        )
-        
-        # Nhánh 2: Decoder ("Họa sĩ phục chế" chuỗi bình thường)
-        self.dec_linear = nn.Linear(emb_dim, 256 * window_size)
-        self.dec_blocks = nn.Sequential(
-            ConvBlock1D(256, 256, stride=1, dropout=0.2),
-            ConvBlock1D(256, 128, stride=1, dropout=0.2),
-            ConvBlock1D(128, 128, stride=1, dropout=0.2),
-            ConvBlock1D(128, 128, stride=1, dropout=0.2),
-            nn.Conv1d(128, in_features, kernel_size=1)
-        )
-
-    def forward(self, x):
-        feat = self.enc_blocks(x)
-        emb = self.adaptive_pool(feat).squeeze(-1)  # Tờ phiếu tóm tắt Embedding: (Batch, 128)
-        y_hat = self.classifier(emb)                # Dự đoán xác suất 12 lớp: (Batch, 12)
-        dec_in = self.dec_linear(emb).view(-1, 256, self.window_size)
-        x_hat = self.dec_blocks(dec_in)             # Chuỗi tái tạo: (Batch, D, L)
-        return x_hat, y_hat, emb
-
-# =====================================================================
-# 4. HÀM MẤT MÁT & HÀM CHẤM ĐIỂM BẤT THƯỜNG KÈM BỘ LỌC FAA
-# =====================================================================
-def redlamp_loss(x_aug, x_hat, w_mask, y_tilde, y_hat, gamma=0.1):
-    # Nhân với (1 - w_mask) để che đi vùng lỗi giả, không bắt Decoder vẽ lại lỗi
-    masked_diff = (1.0 - w_mask) * (x_aug - x_hat)
-    l_mse = torch.mean(torch.sum(masked_diff ** 2, dim=(1, 2)))
-    l_ce = -torch.mean(torch.sum(y_tilde * torch.log(y_hat + 1e-8), dim=-1))
-    return gamma * l_ce + (1.0 - gamma) * l_mse
+```text
+                  Đỉnh chuông (Tâm μ = 0)
+                           _.-""""-._
+                         .'    |     '.
+                        /      |       \
+                       / 34.1% | 34.1%  \        <-- Khúc bụng giữa cao nhất:
+                      /        |         \           34.1% + 34.1% = 68.2%
+                    .'         |          '.
+                  .'   13.6%   |   13.6%    '.   <-- Cộng thêm 2 bên sườn:
+               _.'      |      |      |       '._    13.6% + 68.2% + 13.6% = 95.4%
+         _..--'  2.1%   |      |      |   2.1%   '--.._
+   ========================================================= (Trục giá trị a)
+        -3.0          -2.0   -1.0    0   +1.0   +2.0       +3.0
+                        |<--- 68.2% --->|
+                 |<--------- 95.4% --------->|
+         |<----------------- 99.7% ----------------->|
 ```
 
 ---
 
-## PHẦN 6: LỘ TRÌNH TIẾP TỤC NGHIÊN CỨU CHO BUỔI TIẾP THEO
-*(Khi bắt đầu cuộc hội thoại mới vào ngày mai, bạn chỉ cần gửi file này lên và chọn 1 trong các mục dưới đây để chúng ta đi tiếp)*
+## PHẦN 3: CÂU CHUYỆN CỐT LÕI — TẠI SAO CÁC PHƯƠNG PHÁP CŨ THẤT BẠI & TẠI SAO CẦN REDLAMP?
 
-1. **Chạy thử nghiệm Code trực tiếp trên máy tính:** Chạy kịch bản sinh sóng giả lập và huấn luyện thử mô hình REDLAMP trên 1 tập dữ liệu con của UCR hoặc SMD để quan sát hàm Loss giảm dần và xem biểu đồ bắt lỗi.
-2. **Đọc hiểu cấu trúc Source Code GitHub chính thức của tác giả:** Phân tích từng file trong repo `github.com/KoheiObata/RedLamp` để biết cách nạp dữ liệu của riêng bạn vào mô hình.
-3. **Đi sâu vào Thước đo đánh giá mới (`VUS-PR`, `VUS-ROC`, `Range F-score`):** Tìm hiểu tại sao giới nghiên cứu hiện nay loại bỏ cách tính `Point-Adjusted F1` cũ và cách tính `VUS-PR` trong thực nghiệm.
-4. **Hướng phát triển / Cải tiến bài báo (Future Work cho Đồ án / Luận văn):** Tác giả nêu rõ ở phần Conclusion rằng các phép biến đổi hiện tại đang áp dụng độc lập trên từng chiều đặc trưng và chưa khai thác sâu mối tương quan chéo giữa các cảm biến trong chuỗi đa biến (Multivariate correlation anomalies) — đây là hướng mở rộng cực tốt nếu bạn muốn phát triển nghiên cứu riêng.
+Hãy tưởng tượng bạn cần dạy một AI làm **bảo vệ giám sát nhịp tim hoặc nhiệt độ máy chủ**, nhưng trong dữ liệu lịch sử đưa cho AI học **không hề có ai đánh dấu sẵn chỗ nào là bình thường, chỗ nào là lỗi** (bài toán Không giám sát - *Unsupervised*).
+
+Các nhà khoa học trước nay đi theo 2 hướng chính, nhưng cả 2 đều có "tử huyệt" (minh họa ở **Figure 1** của bài báo):
+
+### Hướng 1: Giả định Bình thường (*Normality Assumption* — dùng Autoencoder, GAN, Transformer thuần túy)
+* **Cách làm:** Giả sử 100% dữ liệu trong tập huấn luyện đều là bình thường. Dạy AI học thuộc lòng cách vẽ lại dữ liệu đó. Hy vọng rằng lúc chạy thật, gặp ca bệnh lạ thì AI sẽ vẽ sai và phát hiện ra.
+* **Tử huyệt — Nhiễm bẩn bất thường (*Anomaly Contamination*):** Trong thực tế, dữ liệu thu thập hàng tháng trời từ máy chủ **luôn bị lẫn một vài lúc máy bị lỗi mà không ai biết** (gọi là dữ liệu bị nhiễm bẩn). Vì mạng học sâu (Deep Learning) rất thông minh, nó học thuộc lòng luôn cả cách vẽ các cục lỗi nhiễm bẩn này! Đến lúc đi thi gặp đúng lỗi đó, nó vẽ lại đẹp như thường $\implies$ **Bỏ sót lỗi thật (False Negative cao)**.
+
+### Hướng 2: Giả định Bất thường Nhị phân (*Binary Anomaly Assumption* — như NCAD, CutAddPaste)
+* **Cách làm:** Tự lấy dữ liệu gốc ra cắt ghép, làm méo đi để tạo thành **"Bất thường giả" (Pseudo-anomalies)**. Sau đó dạy AI phân loại thành **2 nhóm (Nhị phân)**: Nhóm `0` (Dữ liệu gốc = Bình thường) và Nhóm `1` (Dữ liệu cắt ghép = Bất thường).
+* **3 Tử huyệt chí mạng:**
+  1. **Khoảng trống đa dạng (*Diversity Gap*):** Chỉ dùng 1–2 kiểu cắt ghép thì không thể bắt chước hết muôn hình vạn trạng lỗi ngoài đời thực. Những kiểu lỗi chưa được dạy tạo thành một "lỗ hổng kiến thức" (*Diversity Gap*). Nếu tập Train có lỗi nhiễm bẩn rơi vào lỗ hổng này, AI vẫn bị lừa!
+  2. **Bất thường giả vô hại (*False Anomaly / Pseudo-normal*):** Vì máy tính cắt ghép hoàn toàn ngẫu nhiên (chọn bừa đoạn thời gian để làm mượt hoặc cắt dán), có những lúc đoạn bị biến đổi xong **nhìn chẳng khác gì dữ liệu bình thường**! Bài báo gọi đây là **False Anomaly** (mang tiếng là mẫu lỗi giả nhưng thực chất vẫn bình thường). Nếu bắt AI phải tìm cách phân biệt mẫu này với mẫu bình thường, AI sẽ bị tẩu hỏa nhập ma (*Overfitting*) và **báo động giả liên tục (False Positive cao)**.
+  3. **Quá tự tin vào nhãn cứng (*Overconfidence on Labels*):** Gán nhãn cứng tuyệt đối `0` (100% bình thường) cho dữ liệu gốc và `1` (100% lỗi) cho dữ liệu cắt ghép là sai lầm, vì dữ liệu gốc có thể chứa lỗi nhiễm bẩn, còn dữ liệu cắt ghép có thể chứa *False Anomaly*.
+
+### 💡 Giải pháp của REDLAMP: Giả định Bất thường Đa lớp (*Multiclass Anomaly Assumption*)
+REDLAMP giải quyết trọn vẹn cả 4 tử huyệt trên bằng 4 vũ khí:
+1. **Tạo 12 Lớp Đa dạng (1 lớp Bình thường + 11 lớp Lỗi giả chuyên biệt):** Lấp kín *Diversity Gap* và giúp không gian học được có khả năng **giải thích tên loại lỗi (XAI)**.
+2. **Mặt nạ che lỗi (*Anomaly Mask* $W$):** Che phần lỗi giả lại khi dạy Decoder vẽ, để Decoder tuyệt đối chỉ học vẽ phần bình thường.
+3. **Nhãn mềm (*Backward Correction* $\tilde{y}$):** Không bao giờ tin 100% vào nhãn. Luôn dặn AI: *"Mẫu lỗi giả này vẫn có 11% khả năng là bình thường đấy nhé!"* $\implies$ Trị dứt điểm *Overconfidence*.
+4. **Bộ lọc tần suất lúc kiểm thử (*FAA*):** Lúc chạy thực tế, lớp lỗi giả nào bị AI gọi tên quá nhiều ($> 5\%$ tổng thời gian) thì đích thị là lớp *False Anomaly* vô hại $\implies$ Tự động gạch điểm lớp đó về `0`!
+
+---
+
+## PHẦN 4: GIẢI PHẪU TỪNG CÔNG THỨC TOÁN HỌC BẰNG VÍ DỤ SỐ CỤ THỂ
+
+### 4.1. Cửa sổ trượt (Sliding Window — Mục 3.1)
+* **Công thức trong bài báo:**
+  $$X^{(t)} = \{x_{t-L+1}, \dots, x_t\} \in \mathbb{R}^{D \times L}$$
+* **Hiểu đơn giản:** Chuỗi thời gian ban đầu rất dài (ví dụ $T = 25,000$ phút). Mạng AI không đọc cả 25,000 phút cùng lúc mà dùng một khung cửa sổ dài $L = 100$ phút liên tiếp.
+  * Tại phút thứ $t = 100$, cửa sổ $X^{(100)}$ lấy từ phút $1$ đến phút $100$.
+  * Tại phút thứ $t = 101$, cửa sổ $X^{(101)}$ trượt sang phải 1 nấc, lấy từ phút $2$ đến phút $101$.
+* **Mục tiêu:** Với mỗi cửa sổ $X^{(t)}$, AI phải chấm ra một con số điểm bất thường $s(t) \ge 0$. Con số $s(t)$ càng lớn thì khả năng tại thời điểm $t$ đang có sự cố càng cao.
+
+---
+
+### 4.2. Giải thích 12 Phép Biến Đổi Tạo Lỗi Giả & Mặt nạ $W$ (Mục 3.3.2)
+
+Giả sử ta có một đoạn sóng bình thường gồm 6 điểm thời gian:
+$$\text{Gốc: } [10, \; 12, \; 14, \; 16, \; 18, \; 20]$$
+Máy tính chọn ngẫu nhiên khúc giữa (từ vị trí `st = 2` đến `ed = 5`, tức đoạn `[14, 16, 18]`) để tiêm lỗi giả. Khi đó:
+* **Mặt nạ $W$** sẽ bằng `1` ở đúng chỗ bị sửa và bằng `0` ở chỗ giữ nguyên: $W = [0, \; 0, \; \mathbf{1, \; 1, \; 1}, \; 0]$.
+
+Dưới đây là cách 12 phép biến đổi làm thay đổi đoạn `[14, 16, 18]` đó:
+
+| Thứ tự | Tên lớp ($k$) | Công thức trong bài báo | Giải thích bằng lời & Ví dụ số minh họa |
+| :---: | :--- | :--- | :--- |
+| **1** | **Normal** ($k=1$) | $X_{\text{dim}}^{(t,1)} = X_{\text{dim}}^{(t)}$ | **Giữ nguyên 100%** không sửa gì cả: `[10, 12, 14, 16, 18, 20]`. Toàn bộ mặt nạ $W = [0, 0, 0, 0, 0, 0]$. |
+| **2** | **Spike** ($k=2$) | $X_{\text{dim},\text{st}}^{(t,k)} = X_{\text{dim},\text{st}}^{(t)} + a$ | **Cộng một gai nhọn đột biến** tại đúng 1 điểm `st`. Ví dụ cộng $+50$ vào số `14` $\to$ `[10, 12, 64, 16, 18, 20]`. Mặt nạ $W$ chỉ bật số `1` tại đúng điểm gai nhọn đó. |
+| **3** | **Flip** ($k=3$) | $X_{\text{dim},\text{st}:\text{ed}}^{(t,k)} = X_{\text{dim},\text{st}:\text{ed}}^{(t)}[::-1]$ | **Lật ngược thứ tự thời gian** (đầu thành đuôi). Đoạn `[14, 16, 18]` bị lật ngược thành `[18, 16, 14]` $\to$ `[10, 12, 18, 16, 14, 20]`. |
+| **4** | **Speedup** ($k=4$) | Lấy mẫu cách quãng `[::2]` ($2\times$) hoặc nội suy giãn ra ($0.5\times$) | **Tua nhanh gấp đôi hoặc làm chậm đi một nửa** nhịp điệu của sóng (giống như nhịp tim đang đập đều tự nhiên đập nhanh gấp đôi hoặc chậm đi một nửa). |
+| **5** | **Noise** ($k=5$) | $X_{\text{dim},\text{st}:\text{ed}}^{(t,k)} + a, \; a \sim \mathcal{N}(0, 0.1I)$ | **Cộng nhiễu rè (nhiễu trắng)** làm đường sóng bị rung lắc lăn tăn: ví dụ `[14, 16, 18]` $\to$ `[14.3, 15.6, 18.4]`. |
+| **6** | **Cutoff** ($k=6$) | Thay cả đoạn bằng 1 hằng số ngẫu nhiên giữa `min` và `max` | **Làm kẹt cảm biến (đường thẳng ngang)**: Đoạn `[14, 16, 18]` bị đơ cứng ở một giá trị cố định, ví dụ `[15, 15, 15]` $\to$ `[10, 12, 15, 15, 15, 20]`. |
+| **7** | **Average** ($k=7$) | $\text{MovingAverage}(X_{\text{dim},\text{st}:\text{ed}}^{(t)}, w=L/5)$ | **Làm trơn / làm phẳng sóng** bằng cách lấy trung bình cộng của $w=20$ điểm lân cận, làm mất đi các đỉnh nhọn tự nhiên của sóng. |
+| **8** | **Scale** ($k=8$) | $a \times X_{\text{dim},\text{st}:\text{ed}}^{(t)}, \; a \sim \mathcal{N}(1, 1)$ | **Phóng đại hoặc thu nhỏ biên độ**: Nhân cả đoạn với một hệ số $a$ (ví dụ nhân đôi $a=2$: `[14, 16, 18]` $\to$ `[28, 32, 36]`). |
+| **9** | **Wander** ($k=9$) | Cộng dốc tuyến tính `linspace(0, a)` rồi giữ nguyên độ lệch $a$ đến cuối cửa sổ | **Trôi đường cơ sở (Baseline Drift)**: Đoạn giữa bị kéo trượt dốc dần lên $+10$, và **toàn bộ phần đuôi phía sau cũng bị kênh lên $+10$**. Vì phần đuôi cũng bị lệch nên mặt nạ $W = 1$ từ `st` đến tận cuối cửa sổ! |
+| **10** | **Contextual** ($k=10$) | $a \times X_{\text{dim},\text{st}:\text{ed}}^{(t)} + b$ | **Biến đổi ngữ cảnh**: Kết hợp vừa nhân biên độ ($a$) vừa cộng độ lệch nền ($b$). |
+| **11** | **Upsidedown** ($k=11$) | $2 \times \text{Mean} - X_{\text{dim},\text{st}:\text{ed}}^{(t)}$ | **Lật úp ngược đỉnh xuống đáy** qua đường trung bình cộng của đoạn (đỉnh sóng biến thành hố sâu và ngược lại). |
+| **12** | **Mixture** ($k=12$) | $X_{\text{dim},\text{st}:\text{ed}}^{(t,k)} = X_{\text{dim},\text{st}:\text{ed}}^{(t')}$ | **Râu ông nọ cắm cằm bà kia**: Cắt một đoạn từ cửa sổ ở thời điểm $t'$ khác ghép đè vào cửa sổ hiện tại $t$. |
+
+---
+
+### 4.3. Công thức (1) — Nhãn Mềm Hiệu Chỉnh Ngược (Backward Correction)
+
+* **Công thức trong bài báo:**
+  $$\tilde{y}_i^{(t,k)} = \begin{cases} (1 - \alpha - K\beta)y_i^{(t,k)} + \alpha + \beta, & \text{nếu } i = 1 \text{ (vị trí lớp Normal)}, \\ (1 - \alpha - K\beta)y_i^{(t,k)} + \beta, & \text{nếu } i \in \{2, \dots, 12\} \text{ (vị trí 11 lớp Lỗi)}, \end{cases} \quad (1)$$
+
+* **Giải nghĩa từng chữ cái:**
+  * $K = 12$: Tổng số lớp (Lớp số 1 là `Normal`, Lớp số 2 đến 12 là 11 loại lỗi giả).
+  * $y^{(t,k)}$: **Nhãn cứng (One-hot)** ban đầu — là danh sách 12 con số, chỉ có đúng vị trí lớp $k$ bằng `1`, còn lại 11 vị trí kia bằng `0`.
+  * $\tilde{y}^{(t,k)}$: **Nhãn mềm (Soft label)** sau khi đã được làm dịu đi.
+  * $\alpha = 0.1$ ($10\%$): Xác suất dự phòng rằng **"Một mẫu mang tiếng là lỗi giả thực chất nhìn vẫn giống Bình thường (False Anomaly)"**. Vì thế ta luôn cộng bù $\alpha = 0.1$ vào vị trí số 1 (lớp `Normal`)!
+  * $\beta = 0.01$ ($1\%$): Xác suất dự phòng rằng **"Một lớp bất kỳ có thể bị nhầm lẫn sang một trong 12 lớp"**.
+  * Cụm $(1 - \alpha - K\beta)$: Phần độ tin cậy còn lại dành cho lớp chính. Thay số vào: $1 - 0.1 - 12 \times 0.01 = 1 - 0.1 - 0.12 = \mathbf{0.78}$.
+
+* **🔢 Ví dụ tính tay cụ thể (Hiểu ngay trong 10 giây):**
+  * **Trường hợp A — Mẫu đang xét là Lớp 2 (`Spike`, nên $y_2 = 1$ và các vị trí khác $y_i = 0$):**
+    * Nhãn cứng ban đầu: $y = [0, \; \mathbf{1}, \; 0, \; 0, \dots, 0]$.
+    * Tại ô số 1 (Lớp `Normal`, $y_1 = 0$): $\tilde{y}_1 = 0.78 \times 0 + 0.10 + 0.01 = \mathbf{0.11}$ ($11\%$).
+    * Tại ô số 2 (Lớp `Spike`, $y_2 = 1$): $\tilde{y}_2 = 0.78 \times 1 + 0.01 = \mathbf{0.79}$ ($79\%$).
+    * Tại 10 ô lỗi còn lại ($y_i = 0$): $\tilde{y}_i = 0.78 \times 0 + 0.01 = \mathbf{0.01}$ ($1\%$).
+    * $\implies$ **Nhãn mềm thu được:** $\tilde{y} = [\mathbf{0.11}, \; \mathbf{0.79}, \; 0.01, \; 0.01, \dots, 0.01]$ *(Tổng 12 ô cộng lại $= 0.11 + 0.79 + 10 \times 0.01 = 1.00$)*.
+    * **Ý nghĩa:** Khi dạy AI học mẫu `Spike`, ta bảo AI: *"Mẫu này 79% là Spike, nhưng vẫn có 11% khả năng nó là Normal thôi nhé, đừng học cực đoan 100%!"*
+  * **Trường hợp B — Mẫu đang xét là Lớp 1 (`Normal`, nên $y_1 = 1$):**
+    * Tại ô số 1 (`Normal`, $y_1 = 1$): $\tilde{y}_1 = 0.78 \times 1 + 0.10 + 0.01 = \mathbf{0.89}$ ($89\%$).
+    * Tại 11 ô lỗi còn lại ($y_i = 0$): $\tilde{y}_i = \mathbf{0.01}$ ($1\%$ mỗi lớp).
+    * **Ý nghĩa:** Ngay cả mẫu trong tập Train gốc (gán nhãn `Normal`), ta cũng chỉ tin nó $89\%$ là bình thường, chừa lại $11\%$ ($11 \times 1\%$) khả năng nó là **lỗi nhiễm bẩn (Anomaly Contamination)** trà trộn vào!
+
+---
+
+### 4.4. Công thức (2), (3), (4) — Hàm Mất Mát Khi Huấn Luyện (Objective Function)
+
+Trong lúc huấn luyện (Training), AI vừa phải tập **vẽ lại sóng bình thường** (qua nhánh Decoder), vừa phải tập **đoán tên 12 lớp** (qua nhánh Classifier).
+
+#### 1) Công thức (2) — Hàm mất mát tái tạo có mặt nạ ($\mathcal{L}_{\text{MSE}}$):
+$$\mathcal{L}_{\text{MSE}} = \left\| \left(1 - W^{(t,k)}\right) \odot \left(X^{(t,k)} - \hat{X}^{(t,k)}\right) \right\|_2^2 \quad (2)$$
+
+* **Tại sao phải nhân với $(1 - W^{(t,k)})$?**
+  * Nhớ lại: Mặt nạ $W$ bằng `1` ở vùng vừa bị chèn lỗi giả, và bằng `0` ở vùng bình thường.
+  * Vậy $(1 - W)$ sẽ bằng **`0` ở vùng lỗi giả** và bằng **`1` ở vùng bình thường**!
+* **🔢 Ví dụ tính tay 4 con số:**
+  * Sóng bình thường gốc: $[10, \; 10, \; 10, \; 10]$.
+  * Ta chèn lỗi `Spike` vào vị trí thứ 3 $\implies$ Sóng đưa vào $X^{(t,k)} = [10, \; 10, \; \mathbf{50}, \; 10]$, và mặt nạ $W = [0, \; 0, \; \mathbf{1}, \; 0]$.
+  * Giả sử Decoder vẽ ra đường sóng hoàn toàn bình thường: $\hat{X}^{(t,k)} = [10, \; 9, \; \mathbf{10}, \; 10]$.
+  * Hiệu số $(X - \hat{X}) = [0, \; 1, \; \mathbf{40}, \; 0]$. *(Chỗ số 40 rất lớn vì Decoder không chịu vẽ cái gai nhọn 50).*
+  * Nhân với $(1 - W) = [1, \; 1, \; \mathbf{0}, \; 1]$:
+    $$(1 - W) \odot (X - \hat{X}) = [1\times 0, \; 1\times 1, \; \mathbf{0\times 40}, \; 1\times 0] = [0, \; 1, \; \mathbf{0}, \; 0]$$
+  * Bình phương và cộng lại: $\mathcal{L}_{\text{MSE}} = 0^2 + 1^2 + 0^2 + 0^2 = 1$.
+  * **Bài học rút ra:** Nhờ nhân với `0` ở vị trí có lỗi giả, **Decoder KHÔNG bị phạt khi nó từ chối vẽ cái gai nhọn 50**! Nhờ đó, Decoder chỉ tập trung học vẽ những phần bình thường. Đến lúc chạy thật (Test), gặp lỗi thật, Decoder sẽ tiếp tục vẽ đường bình thường $\implies$ lệch lớn với lỗi thật $\implies$ Bắt được lỗi!
+
+#### 2) Công thức (3) — Hàm mất mát phân loại nhãn mềm ($\mathcal{L}_{\text{CE}}$):
+$$\mathcal{L}_{\text{CE}} = -\sum_{i=1}^{K} \tilde{y}_i^{(t,k)} \log\left(\hat{y}_i^{(t,k)}\right) \quad (3)$$
+* **Giải thích đơn giản:**
+  * $\hat{y}_i^{(t,k)}$ là xác suất mà nhánh Classifier dự đoán cho lớp thứ $i$ (từ $1$ đến $12$).
+  * $\tilde{y}_i^{(t,k)}$ là nhãn mềm mục tiêu vừa tính ở Công thức (1).
+  * Hàm $-\log(\hat{y}_i)$ có tính chất: Nếu AI đoán đúng xác suất cao ($\hat{y}_i$ gần $1.0$), thì $-\log(\hat{y}_i)$ rất nhỏ (gần $0$ = không bị phạt). Nếu AI đoán sai ($\hat{y}_i$ gần $0$), thì $-\log(\hat{y}_i)$ vọt lên rất lớn (= bị phạt nặng).
+
+#### 3) Công thức (4) — Tổng hợp hàm mất mát ($\mathcal{L}$):
+$$\mathcal{L} = \gamma \mathcal{L}_{\text{CE}} + (1 - \gamma) \mathcal{L}_{\text{MSE}} \quad (4)$$
+* Với $\gamma = 0.1$, tổng mức phạt khi huấn luyện bằng **$10\%$ điểm phạt phân loại ($\mathcal{L}_{\text{CE}}$) + $90\%$ điểm phạt vẽ lại sóng ($\mathcal{L}_{\text{MSE}}$)**. Cả hai nhánh cùng rèn luyện chung bộ não Encoder!
+
+---
+
+### 4.5. Công thức (5), (6), (7), (8) — Chấm Điểm Bất Thường Lúc Kiểm Thử (Test Time) & Bộ Lọc FAA
+
+Khi mang mô hình đã học xong ra chạy trên tập dữ liệu thực tế $X^{\text{test}}$ (lúc này không còn chèn lỗi giả nữa mà đi tìm lỗi thật):
+
+#### Bước 1: Tính điểm sai số vẽ lại sóng — Công thức (5)
+$$s_{\text{MSE}}(t) = \left\| X^{(t)} - \hat{X}^{(t)} \right\|_2^2 \quad (5)$$
+* Lấy cửa sổ thực tế $X^{(t)}$ trừ đi hình vẽ lại $\hat{X}^{(t)}$ của Decoder rồi bình phương cộng tổng lại. Nếu cửa sổ có lỗi thật, Decoder không biết vẽ lỗi nên $s_{\text{MSE}}(t)$ sẽ cao vọt lên.
+
+#### Bước 2: Lọc bỏ "Lớp giả bình thường" bằng bộ lọc FAA — Công thức (6) & (7)
+$$\text{FAA}\left(\hat{y}_i^{(t)}\right) = \begin{cases} 0, & \text{nếu } \frac{1}{T - L + 1}\sum_{j=L}^{T} \hat{y}_i^{(j)} > \delta, \\ \hat{y}_i^{(t)}, & \text{ngược lại}, \end{cases} \quad (6)$$
+$$s_{\text{CE}}(t) = \sum_{i=2}^{K} \text{FAA}\left(\hat{y}_i^{(t)}\right) \quad (7)$$
+
+* **Giải thích từng ký hiệu trong Công thức (6):**
+  * Cụm $\frac{1}{T - L + 1}\sum_{j=L}^{T} \hat{y}_i^{(j)}$: Chính là **trung bình cộng xác suất dự đoán của lớp lỗi thứ $i$ trên toàn bộ chuỗi thời gian kiểm thử**.
+  * $\delta = 0.05$ ($5\%$): Ngưỡng trần cho phép.
+* **🔢 Ví dụ thực tế về FAA:**
+  * Giả sử trên một chuỗi dữ liệu có chu kỳ rất dài, phép biến đổi `Average` (Lớp 7) lúc huấn luyện tạo ra các mẫu nhìn y hệt dữ liệu bình thường (*False Anomaly*).
+  * Hệ quả là khi chạy trên tập Test, lúc nào máy đang chạy bình thường thì Classifier cũng tưởng nhầm là lớp `Average`! Trung bình trên toàn bộ chuỗi Test, xác suất của lớp `Average` đạt tới **$0.18$ ($18\%$)** — lớn hơn ngưỡng $\delta = 0.05$ ($5\%$).
+  * Bộ lọc **FAA** lập tức phán: *"Không có cái lỗi thật nào lại xuất hiện tới 18% toàn thời gian cả! Lớp Average này là lớp giả bình thường (Pseudo-normal class)!"* $\implies$ FAA **gạch điểm của lớp `Average` về `0`** ở mọi thời điểm!
+  * Sau khi đã lọc sạch các lớp báo động giả, **Công thức (7)** cộng tổng xác suất của các lớp lỗi còn lại (từ lớp $i=2$ đến $12$, bỏ qua lớp $i=1$ là Normal) để ra điểm phân loại $s_{\text{CE}}(t)$.
+
+#### Bước 3: Cộng gộp thành Điểm Bất Thường Cuối Cùng — Công thức (8)
+$$s(t) = \frac{1}{2}\text{MinMax}_T\left(s_{\text{MSE}}(t)\right) + \frac{1}{2}\text{MinMax}_T\left(s_{\text{CE}}(t)\right) \quad (8)$$
+* **Tại sao phải có $\text{MinMax}_T(\cdot)$ trước khi cộng?**
+  * Vì điểm sai số vẽ lại $s_{\text{MSE}}(t)$ có thể lên tới hàng chục (ví dụ từ `0.2` đến `45.0`), trong khi điểm tổng xác suất $s_{\text{CE}}(t)$ chỉ nằm trong khoảng từ `0.0` đến `1.0`. Nếu cộng trực tiếp thì $s_{\text{MSE}}$ sẽ lấn át hoàn toàn $s_{\text{CE}}$.
+  * Hàm $\text{MinMax}_T$ kéo cả hai thang điểm về cùng một thang chuẩn từ **`0.0` (thấp nhất chuỗi) đến `1.0` (cao nhất chuỗi)** theo công thức:
+    $$\text{MinMax}_T(s(t)) = \frac{s(t) - \min(s)}{\max(s) - \min(s)}$$
+  * Sau đó lấy trung bình cộng ($\frac{1}{2}$ điểm tái tạo chuẩn hóa + $\frac{1}{2}$ điểm phân loại chuẩn hóa) để thu được điểm bất thường cuối cùng $s(t) \in [0, 1]$.
+
+---
+
+## PHẦN 5: TẠI SAO BÀI BÁO DÙNG THƯỚC ĐO `VUS-PR` VÀ `VUS-ROC`?
+
+Nếu bạn mới học Machine Learning, bạn sẽ quen với `Accuracy` (Độ chính xác) hoặc `F1-Score`. Nhưng trong Chuỗi thời gian (TSAD), các thước đo cũ gặp 2 vấn đề lớn:
+1. **Bất thường rất hiếm (Mất cân bằng dữ liệu nặng):** Trong tập UCR, lỗi chỉ chiếm `0.85%` thời gian (còn `99.15%` là bình thường). Một mô hình "lười biếng" lúc nào cũng đoán Bình thường sẽ đạt ngay `Accuracy = 99.15%` dù không bắt được bất kỳ lỗi nào!
+2. **Lỗi kéo dài theo khoảng thời gian (Range) và phụ thuộc ngưỡng cắt (Threshold):** Khi sự cố xảy ra từ giây thứ 100 đến giây thứ 120, nếu AI báo động cao ở giây 98 (sớm hơn 2 giây do cửa sổ trượt) thì về mặt thực tế vẫn là rất tốt.
+
+Vì vậy, KDD '25 sử dụng bộ thước đo chuẩn mới nhất:
+* **Range-AUC-ROC (`R-R`) & Range-AUC-PR (`R-P`):** Mở rộng vùng lỗi thật ra hai đầu một khoảng đệm (buffer) bằng nửa cửa sổ ($L/2 = 50$ bước) và tính diện tích dưới đường cong ROC / PR trên mọi ngưỡng cắt.
+* **VUS-ROC (`V-R`) & VUS-PR (`V-P` — *Volume Under the Surface*):** Thay vì chỉ tính với 1 độ dài vùng đệm cố định, VUS thay đổi độ dài vùng đệm liên tục để tạo thành một mặt cong 3D rồi tính thể tích dưới mặt cong đó. Trong đó, **`VUS-PR` là thước đo khắt khe và đáng tin cậy số 1 hiện nay** (càng gần `1.0` càng tốt).
+
+### Tóm tắt Kết quả Thực nghiệm Nổi bật của REDLAMP (Mục 4.2 – 4.6)
+1. **Đứng đầu trên 5 bộ dữ liệu (Q1):** Đạt trung bình **`VUS-ROC = 0.803`**, **`VUS-PR = 0.430`** (vượt phương pháp đứng thứ hai là *CutAddPaste* tới **+17.4%**).
+2. **Chứng minh vai trò của từng thành phần (Q2 - Ablation Study):** Nếu tắt bất kỳ thành phần nào (`w/o AM` - tắt mặt nạ $W$, `w/o BC` - tắt nhãn mềm, `w/o FAA` - tắt bộ lọc FAA, hoặc gộp 11 lớp lỗi về phân loại nhị phân `Binary`), điểm `VUS-PR` lập tức tụt giảm mạnh (giảm tới **24.5%** trên SMD khi quay về phân loại nhị phân!).
+3. **Sức đề kháng trước dữ liệu bẩn (Q4 - Robustness):** Khi cố tình trộn thêm **5% lỗi vào tập Train** của UCR để làm bẩn dữ liệu, REDLAMP chỉ giảm nhẹ **1.8%** điểm `VUS-PR`, trong khi *CutAddPaste* sụt giảm tới **15.5%** và các mô hình Autoencoder/Transformer thuần túy sụp đổ nặng nề.
+4. **Khả năng giải thích nguyên nhân lỗi (Q5 - Explainability):** Nhìn vào biểu đồ phân cụm 2D của các vector `Embedding` 128 chiều, các điểm lỗi thật trên tập Test nằm sát cụm lớp lỗi giả nào sẽ chỉ ra ngay hình thái vật lý của sự cố đó (ví dụ: lỗi nhịp sinh học côn trùng EPG nằm sát cụm `Speedup`; lỗi nhiễu sóng huyết áp ABP nằm sát cụm `Noise`; lỗi máy chủ SMD nằm gần `Spike` và `Cutoff`).
+
+---
+
+## PHẦN 6: BẢNG TỔNG HỢP SIÊU THAM SỐ CỐ ĐỊNH CỦA MÔ HÌNH (TABLE 4)
+
+Toàn bộ các tập dữ liệu trong bài báo đều dùng chung một bộ thông số duy nhất (không cần chỉnh tay cho từng tập):
+
+| Tên tham số | Ký hiệu | Giá trị mặc định | Ý nghĩa dễ hiểu |
+| :--- | :---: | :---: | :--- |
+| Kích thước cửa sổ trượt | $L$ | `100` | Mỗi lần AI nhìn một đoạn gồm 100 điểm thời gian liên tiếp. |
+| Số chiều không gian ẩn (Embedding) | `emb_dim` | `128` | Đoạn sóng 100 điểm được Encoder tóm tắt thành đúng 128 con số. |
+| Tổng số lớp phân loại | $K$ | `12` | Gồm 1 lớp `Normal` + 11 lớp bất thường giả. |
+| Xác suất mẫu lỗi giả thực ra là bình thường | $\alpha$ | `0.10` ($10\%$) | Dùng trong Công thức (1) để làm mềm nhãn về phía lớp Normal. |
+| Xác suất nhầm lẫn giữa các lớp | $\beta$ | `0.01` ($1\%$) | Dùng trong Công thức (1) để chia đều xác suất dự phòng cho mọi lớp. |
+| Trọng số hàm mất mát phân loại | $\gamma$ | `0.10` | Dùng trong Công thức (4): $\mathcal{L} = 0.1\mathcal{L}_{\text{CE}} + 0.9\mathcal{L}_{\text{MSE}}$. |
+| Ngưỡng lọc lớp giả bình thường FAA | $\delta$ | `0.05` ($5\%$) | Dùng trong Công thức (6): Lớp lỗi nào xuất hiện $> 5\%$ toàn thời gian Test sẽ bị gạch điểm về 0. |

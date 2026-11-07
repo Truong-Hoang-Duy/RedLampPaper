@@ -26,6 +26,7 @@ class MetaAEC(nn.Module):
         self.label_smoothing = params.label_smoothing
         self.alpha = params.alpha
         self.beta = params.beta
+        self.fix_double_softmax = params.get('fix_double_softmax', False)
 
     def forward(self, x):
         # print('meta x [batch, window, in_feature]', x.shape)
@@ -52,7 +53,11 @@ class MetaAEC(nn.Module):
             label = label * (1 - self.alpha - self.beta*self.classes + self.beta) + (1 - label) * self.beta
             label[:, normal_loc] += self.alpha
 
-        loss_c = loss_C(pred_label, label)
+        if self.fix_double_softmax:
+            # pred_label is already a softmax output: Eq.3, -sum(y * log(y_hat))
+            loss_c = -(label * torch.log(pred_label.float().clamp_min(1e-8))).sum(dim=1)
+        else:
+            loss_c = loss_C(pred_label, label)
         loss_c = torch.mean(loss_c)
         return (1-self.c_loss_ratio)*loss_ae + self.c_loss_ratio*loss_c, loss_ae, loss_c
 

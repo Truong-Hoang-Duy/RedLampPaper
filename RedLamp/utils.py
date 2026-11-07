@@ -1,3 +1,4 @@
+import os
 import torch
 import random
 import numpy as np
@@ -17,6 +18,24 @@ class AttrDict(dict):
         elif attrs is not None:
             raise NotImplementedError
         return self
+
+def get_rng_state():
+    state = {'python': random.getstate(), 'numpy': np.random.get_state(), 'torch': torch.get_rng_state()}
+    if torch.cuda.is_available():
+        state['cuda'] = torch.cuda.get_rng_state_all()
+    return state
+
+def set_rng_state(state):
+    random.setstate(state['python'])
+    np.random.set_state(state['numpy'])
+    torch.set_rng_state(state['torch'])
+    if 'cuda' in state and torch.cuda.is_available():
+        torch.cuda.set_rng_state_all(state['cuda'])
+
+def save_atomic(obj, path):
+    tmp = f'{path}.tmp'
+    torch.save(obj, tmp)
+    os.replace(tmp, path)
 
 def create_dir_from_params(params):
     dir_path = "/".join([f"{key}={value}" for key, value in params.items()])

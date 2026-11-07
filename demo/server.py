@@ -20,7 +20,7 @@ from sklearn.decomposition import PCA
 
 DEMO_DIR = Path(__file__).resolve().parent
 ROOT_DIR = DEMO_DIR.parent
-REDLAMP_DIR = ROOT_DIR / "RedLamp"
+REDLAMP_DIR = ROOT_DIR / "RedLamp" if (ROOT_DIR / "RedLamp").exists() else ROOT_DIR / "REDLAMP"
 RETRAIN_DIR = ROOT_DIR / "redlamp_retraining"
 PORTABLE_DIR = DEMO_DIR / "portable_data"
 STATIC_DIR = DEMO_DIR / "static"
