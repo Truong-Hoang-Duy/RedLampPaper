@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")"
 
 echo "========================================================"
-echo "  RedLamp Vibrant Web Studio (KDD '25) - macOS / Linux"
+echo "  RedLamp Web Demo (demo_redlamp) - macOS / Linux"
 echo "========================================================"
 
 if [ -x ".venv/bin/python" ]; then
@@ -18,18 +18,12 @@ else
     echo "[INFO] Sử dụng Python hệ thống: $(command -v python)"
 fi
 
-if ! "$PY_CMD" -c "import fastapi, uvicorn, torch, numpy, pandas, sklearn, scipy" >/dev/null 2>&1; then
-    echo "[INFO] Đang cài đặt các thư viện còn thiếu từ requirements.txt..."
-    "$PY_CMD" -m pip install -r requirements.txt
-fi
-
-echo "[INFO] Đang mở trình duyệt tại http://localhost:8080 ..."
+echo "[INFO] Đang mở trình duyệt tại http://127.0.0.1:8000 ..."
 if command -v open >/dev/null 2>&1; then
-    (sleep 1.5 && open "http://localhost:8080") &
+    (sleep 1.5 && open "http://127.0.0.1:8000") &
 elif command -v xdg-open >/dev/null 2>&1; then
-    (sleep 1.5 && xdg-open "http://localhost:8080") &
+    (sleep 1.5 && xdg-open "http://127.0.0.1:8000") &
 fi
 
-echo "[INFO] Khởi chạy FastAPI Server tại cổng 8080 (Nhấn Ctrl+C để dừng)..."
-exec "$PY_CMD" -m uvicorn demo.server:app --host 0.0.0.0 --port 8080 --reload
-
+echo "[INFO] Khởi chạy FastAPI Server (demo_redlamp/server.py) tại cổng 8000..."
+exec "$PY_CMD" demo_redlamp/server.py

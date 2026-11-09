@@ -2,10 +2,10 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "🚀 Run RedLamp Web Studio (Port 8080)",
+      "label": "🚀 Run RedLamp Web Demo (demo_redlamp - Port 8000)",
       "type": "shell",
       "windows": {
-        "command": "if (Test-Path .venv\\Scripts\\python.exe) { .\\.venv\\Scripts\\python.exe -m uvicorn demo.server:app --host 0.0.0.0 --port 8080 --reload } else { python -m uvicorn demo.server:app --host 0.0.0.0 --port 8080 --reload }",
+        "command": "if (Test-Path .venv\\Scripts\\python.exe) { .\\.venv\\Scripts\\python.exe demo_redlamp\\server.py } else { python demo_redlamp\\server.py }",
         "options": {
           "shell": {
             "executable": "powershell.exe",
@@ -14,7 +14,7 @@
         }
       },
       "osx": {
-        "command": "if [ -x .venv/bin/python ]; then .venv/bin/python -m uvicorn demo.server:app --host 0.0.0.0 --port 8080 --reload; elif command -v python3 >/dev/null 2>&1; then python3 -m uvicorn demo.server:app --host 0.0.0.0 --port 8080 --reload; else python -m uvicorn demo.server:app --host 0.0.0.0 --port 8080 --reload; fi",
+        "command": "if [ -x .venv/bin/python ]; then .venv/bin/python demo_redlamp/server.py; elif command -v python3 >/dev/null 2>&1; then python3 demo_redlamp/server.py; else python demo_redlamp/server.py; fi",
         "options": {
           "shell": {
             "executable": "/bin/zsh",
@@ -23,7 +23,7 @@
         }
       },
       "linux": {
-        "command": "if [ -x .venv/bin/python ]; then .venv/bin/python -m uvicorn demo.server:app --host 0.0.0.0 --port 8080 --reload; elif command -v python3 >/dev/null 2>&1; then python3 -m uvicorn demo.server:app --host 0.0.0.0 --port 8080 --reload; else python -m uvicorn demo.server:app --host 0.0.0.0 --port 8080 --reload; fi"
+        "command": "if [ -x .venv/bin/python ]; then .venv/bin/python demo_redlamp/server.py; elif command -v python3 >/dev/null 2>&1; then python3 demo_redlamp/server.py; else python demo_redlamp/server.py; fi"
       },
       "options": {
         "cwd": "${workspaceFolder}"
@@ -64,10 +64,10 @@
       "problemMatcher": []
     },
     {
-      "label": "📦 Install Requirements (Win & macOS)",
+      "label": "✅ Run Demo Unit Tests (pytest)",
       "type": "shell",
       "windows": {
-        "command": "if (Test-Path .venv\\Scripts\\python.exe) { .\\.venv\\Scripts\\python.exe -m pip install -r requirements.txt } else { python -m pip install -r requirements.txt }",
+        "command": "if (Test-Path .venv\\Scripts\\python.exe) { .\\.venv\\Scripts\\python.exe -m pytest demo_redlamp/tests/test_demo.py -v } else { python -m pytest demo_redlamp/tests/test_demo.py -v }",
         "options": {
           "shell": {
             "executable": "powershell.exe",
@@ -76,10 +76,10 @@
         }
       },
       "osx": {
-        "command": "if [ -x .venv/bin/python ]; then .venv/bin/python -m pip install -r requirements.txt; elif command -v python3 >/dev/null 2>&1; then python3 -m pip install -r requirements.txt; else python -m pip install -r requirements.txt; fi"
+        "command": "if [ -x .venv/bin/python ]; then .venv/bin/python -m pytest demo_redlamp/tests/test_demo.py -v; elif command -v python3 >/dev/null 2>&1; then python3 -m pytest demo_redlamp/tests/test_demo.py -v; else python -m pytest demo_redlamp/tests/test_demo.py -v; fi"
       },
       "linux": {
-        "command": "if [ -x .venv/bin/python ]; then .venv/bin/python -m pip install -r requirements.txt; elif command -v python3 >/dev/null 2>&1; then python3 -m pip install -r requirements.txt; else python -m pip install -r requirements.txt; fi"
+        "command": "if [ -x .venv/bin/python ]; then .venv/bin/python -m pytest demo_redlamp/tests/test_demo.py -v; elif command -v python3 >/dev/null 2>&1; then python3 -m pytest demo_redlamp/tests/test_demo.py -v; else python -m pytest demo_redlamp/tests/test_demo.py -v; fi"
       },
       "options": {
         "cwd": "${workspaceFolder}"
@@ -91,36 +91,6 @@
         "panel": "shared"
       },
       "problemMatcher": []
-    },
-    {
-      "label": "📊 Run Legacy Streamlit Demo (Port 8501)",
-      "type": "shell",
-      "windows": {
-        "command": "if (Test-Path .venv\\Scripts\\python.exe) { .\\.venv\\Scripts\\python.exe -m streamlit run demo/app.py } else { python -m streamlit run demo/app.py }",
-        "options": {
-          "shell": {
-            "executable": "powershell.exe",
-            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
-          }
-        }
-      },
-      "osx": {
-        "command": "if [ -x .venv/bin/python ]; then .venv/bin/python -m streamlit run demo/app.py; elif command -v python3 >/dev/null 2>&1; then python3 -m streamlit run demo/app.py; else python -m streamlit run demo/app.py; fi"
-      },
-      "linux": {
-        "command": "if [ -x .venv/bin/python ]; then .venv/bin/python -m streamlit run demo/app.py; elif command -v python3 >/dev/null 2>&1; then python3 -m streamlit run demo/app.py; else python -m streamlit run demo/app.py; fi"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "presentation": {
-        "echo": true,
-        "reveal": "always",
-        "focus": true,
-        "panel": "dedicated"
-      },
-      "problemMatcher": []
     }
   ]
 }
-
