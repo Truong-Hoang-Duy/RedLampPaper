@@ -14,14 +14,6 @@
 
 Trong bài thuyết trình đồ án cuối kỳ (**30 – 35 phút**, chiếm 50% điểm môn học; mỗi câu trả lời phản biện tốt được cộng **+0.5 điểm**), phần **Live Web Demo** nên kéo dài **5 – 7 phút** ngay sau khi nhóm trình bày xong *Methodology* và *Experiments*.
 
-```mermaid
-flowchart LR
-    Start["Khởi chạy run_demo.bat\n(http://127.0.0.1:8000)"] --> T1["Chặng 1 (~1.5 phút)\nTab 1: Chọn Pretrain & Mô hình\n(Cấu hình, 3 Metrics, Tổng quan chuỗi)"]
-    T1 --> T3["Chặng 2 (~2.5 phút)\nTab 3: Trình bày Giải thích\n(Đi qua 5 bước mở hộp đen ConvAEC)"]
-    T3 --> T2["Chặng 3 (~1.5 phút)\nTab 2: Nhập điểm & Dự đoán\n(Test điểm chuẩn -> Test điểm đột biến)"]
-    T2 --> Sync["Chặng 4 (~0.5 phút)\nBấm nút Đồng bộ Giải thích\n(Nhảy tự động về Tab 3 xem điểm vừa nhập)"]
-```
-
 ### Khởi động trước giờ thuyết trình (30 giây)
 1. Nhấp đúp tệp [`../run_demo.bat`](../run_demo.bat) ở thư mục gốc dự án (hoặc chạy lệnh `python demo_redlamp/server.py`).
 2. Trình duyệt tự động mở `http://127.0.0.1:8000`. Nhấn phím **`F11`** để bật toàn màn hình (giao diện thiết kế chuẩn `100vh` Zero-Scroll vừa khít khung chiếu, chữ lớn tối thiểu `24px` trên đồ thị).
@@ -29,69 +21,95 @@ flowchart LR
 > [!WARNING]
 > **3 Lưu ý "sống còn" trên giao diện thực tế để không bị khựng trên sân khấu:**
 > 1. **Thứ tự 3 nút Tab trên thanh Header thực tế:** Từ trái sang phải là **`1. Chọn Pretrain & Mô hình`** $\rightarrow$ **`2. Nhập điểm & Dự đoán`** $\rightarrow$ **`3. Trình bày Giải thích`**. Luồng dẫn chuyện thuyết phục nhất cho người nghe là: **`Tab 1` $\rightarrow$ bấm sang `Tab 3` (giải phẫu 5 bước bên trong mạng trên chuỗi mẫu có sẵn) $\rightarrow$ quay về `Tab 2` (nhập tay điểm mới để test trực tiếp) $\rightarrow$ bấm nút `🔍 Xem giải thích cho điểm này (Đồng bộ)` để tự động bay ngược sang `Tab 3`**.
-> 2. **Bẫy nhập số trên tập mặc định `SMD / machine-1-1` (`38 dims`):** Nếu ở Tab 2 bạn chỉ sửa 1 ô `D1 = 5.0` và giữ nguyên 37 chiều còn lại, mô hình **VẪN BÁO `TRẠNG THÁI BÌNH THƯỜNG`** (`Điểm kết hợp thô = 0.1952 < Ngưỡng P99.5 = 0.5045`) vì sai số `MSE` tính trung bình trên cả $38 \times 100 = 3,800$ phần tử! Để kích hoạt báo đỏ **`PHÁT HIỆN BẤT THƯỜNG`** tức thì:
+> 2. **Bẫy nhập số trên tập mặc định `SMD / machine-1-1` (`38 đặc trưng`):** Nếu ở Tab 2 bạn chỉ sửa 1 ô `D1 = 5.0` và giữ nguyên 37 đặc trưng còn lại, mô hình **VẪN BÁO `TRẠNG THÁI BÌNH THƯỜNG`** (`Điểm kết hợp thô = 0.1952 < Ngưỡng P99.5 = 0.5045`) vì sai số `MSE` tính trung bình trên cả $38 \times 100 = 3,800$ phần tử! Để kích hoạt báo đỏ **`PHÁT HIỆN BẤT THƯỜNG`** tức thì:
 >    * **Trên `SMD / machine-1-1`:** Sửa **5 ô đầu `D1..D5` cùng bằng `5.0`** (ra nhóm *Đỉnh nhọn - Spike 99.9%*), hoặc nếu chỉ sửa 1 ô thì gõ **`D1 = 15.0`**.
->    * **Hoặc chuyển sang tập 1 chiều `AIOps / IOPS`:** Chỉ có **1 ô nhập duy nhất**, gõ **`3.0`** hoặc **`5.0`** là nổ đỏ *Đỉnh nhọn - Spike 100.0%* ngay lập tức!
+>    * **Hoặc chuyển sang tập 1 đặc trưng `AIOps / IOPS`:** Chỉ có **1 ô nhập duy nhất**, gõ **`3.0`** hoặc **`5.0`** là nổ đỏ *Đỉnh nhọn - Spike 100.0%* ngay lập tức!
 > 3. **Danh sách Thực thể đã có sẵn Offline trên ổ cứng (`result/`) — Bấm ăn ngay trong 0.2 giây không cần Wi-Fi giảng đường:**
->    * **`SMD (38 dims)`:** `machine-1-1` (Seed 0), `machine-1-2` (Seed 0, 1), `machine-1-3` (Seed 0), `machine-1-4` (Seed 0).
->    * **`AIOps / IOPS (1 dim)`:** Thực thể đầu tiên `KPI-05f10d3a-239c-3bef-9bdc-a2feeb0037aa` (Seed 0).
->    * **`MSL (55 dims)`:** `C-1`, `D-14`, `D-15`, `D-16`, `F-8`... (Seed 0).
->    * **`SMAP (25 dims)`:** `A-1`, `A-2`, `A-3` (Seed 0).
->    * **`UCR (Anomaly Archive - 1 dim)`:** `001` (Seed 0).
+>    * **`SMD (38 đặc trưng)`:** `machine-1-1` (Seed 0), `machine-1-2` (Seed 0, 1), `machine-1-3` (Seed 0), `machine-1-4` (Seed 0).
+>    * **`AIOps / IOPS (1 đặc trưng)`:** Thực thể đầu tiên `KPI-05f10d3a-239c-3bef-9bdc-a2feeb0037aa` (Seed 0).
+>    * **`MSL (55 đặc trưng)`:** `C-1`, `D-14`, `D-15`, `D-16`, `F-8`... (Seed 0).
+>    * **`SMAP (25 đặc trưng)`:** `A-1`, `A-2`, `A-3` (Seed 0).
+>    * **`UCR (Anomaly Archive - 1 đặc trưng)`:** `001` (Seed 0).
 >    *(Nếu chọn thực thể/seed ngoài danh sách trên, hệ thống sẽ tải On-Demand từ Kaggle `ngphcdanh/redlamp-retraining` mất vài giây nếu có mạng).*
 
 ---
 
 ## 1. Chặng 1 (~1.5 Phút): Tab `1. Chọn Pretrain & Mô hình`
 
-Khi mở trang web, hệ thống nạp sẵn **`SMD (Server Machine Dataset - 38 dims)`** $\rightarrow$ **`machine-1-1`** $\rightarrow$ **`Seed 0 (Mặc định)`**.
+Khi mở trang web, hệ thống nạp sẵn **`SMD (Server Machine Dataset - 38 đặc trưng)`** $\rightarrow$ **`ALL (Trung bình cả 28 thực thể)`** $\rightarrow$ **`Seed 0 (Mặc định)`**.
+*(Khi để `ALL`, bảng Metrics hiển thị trung bình toàn tập khớp 100% với **Table 4** trong báo cáo, đồng thời dùng `machine-1-1` làm chuỗi mẫu đại diện cho đồ thị và các tab sau).*
 
 ### Thao tác 1.1: Khối trên cùng — `Bộ chọn Dataset & Entity`
-* **Hành động:** Bấm mở hộp thả xuống **`1. Tập dữ liệu (Dataset)`** để giới thiệu đủ **5 bộ dữ liệu chuẩn của bài báo KDD '25**, sau đó giữ ở `SMD / machine-1-1 / Seed 0`.
-* **Bảng đối chiếu ý nghĩa `dims` & kết quả tái lập của nhóm (Table 2 & Table 4 trong báo cáo):**
+* **Ý nghĩa của `Seed (0 → 4)` (tương ứng mã hạt giống `100..104` trong code):** Tập `Train/Test` của chuỗi thời gian là **cố định theo dòng thời gian** (không chia ngẫu nhiên). Mỗi `Seed` kiểm soát **3 yếu tố ngẫu nhiên trong lúc huấn luyện**:
+  1. **Tự sinh 11 kiểu lỗi giả (*Data Augmentation*):** Bốc thăm ngẫu nhiên kiểu lỗi (`spike`, `wander`, `cutoff`...), vị trí thời gian nhét lỗi trong cửa sổ 100 điểm, đặc trưng cảm biến bị tác động và cường độ lỗi.
+  2. **Khởi tạo trọng số mạng (*Weight Initialization*):** Khởi tạo giá trị ngẫu nhiên ban đầu cho các bộ lọc của `ConvAEC` (`Encoder`, `Decoder`, `Classifier`).
+  3. **Xáo trộn thứ tự học (*Batch Shuffling*):** Đảo ngẫu nhiên thứ tự đưa các cửa sổ huấn luyện vào mô hình ở mỗi vòng `Epoch`.
 
-| Tên trên Demo | Số đặc trưng (`dims` = $D$) | Đặc điểm EDA cốt lõi từ báo cáo nhóm | Kết quả tái lập 5 Seeds của Nhóm vs. Bài báo gốc (`VUS-PR`) |
+
+| Tên trên Demo (`Entity = ALL`) | Số đặc trưng (`n_features` = $D$) | Đặc điểm EDA cốt lõi từ báo cáo nhóm | Kết quả hiển thị tại `ALL` (`Seed 0` $\rightarrow$ **Trung bình 5 Seeds** vs. *Paper*) |
 | :--- | :---: | :--- | :--- |
-| **`SMD`** *(Server Machine)* | `38 dims` | 28 máy chủ theo dõi 38 features (CPU, RAM, Disk, Network...) suốt 5 tuần; tỷ lệ lỗi Test `4.21%`; trung vị mỗi đoạn lỗi tác động đồng thời lên **4 chiều**. | Nhóm đạt **`0.374 ± 0.013`** (**vượt** bài báo gốc `0.366`). |
-| **`AIOps / IOPS`** *(Cloud KPIs)* | `1 dim` | 29 chuỗi KPI web đám mây đơn biến; tập Train **bị nhiễm bẩn sẵn `2.49%` lỗi thật** (9/29 chuỗi nhiễm bẩn $>5\%$). | Nhóm đạt **`0.458 ± 0.009`** (**vượt** bài báo gốc `0.448`). |
-| **`MSL`** *(Mars Rover)* | `55 dims` | 23 thực thể tàu tự hành Sao Hỏa NASA (`13.01%` lỗi Test); trung bình `41.9/54` cột lệnh giữ hằng số nên dễ sinh *False Anomaly*. | Nhóm đạt **`0.469 ± 0.022`** (sát bài báo gốc `0.482`, nằm gọn trong 1 độ lệch chuẩn). |
-| **`SMAP`** *(NASA Satellite)* | `25 dims` | Vệ tinh đo độ ẩm đất NASA (`11.14%` lỗi Test); gộp chung các kênh khi train 1 model chia sẻ vì mỗi kênh chỉ dài ~2,752 điểm. | Nhóm đạt **`0.329 ± 0.015`** (bài báo `0.360`; do kênh `P-2` lặp 2 lần trong code gốc & căn chỉnh cửa sổ). |
-| **`UCR`** *(Anomaly Archive)* | `1 dim` | 250 chuỗi đa lĩnh vực (ECG, ABP, EPG...); tập Train sạch 0% lỗi, **77.7% đoạn lỗi nằm gọn trong biên độ bình thường** (*lỗi hình thái*). | Hiển thị số chuẩn bài báo: `VUS-ROC = 0.8970`, `VUS-PR = 0.4920`, `RF = 0.2340`. |
+| **`SMD`** *(28 thực thể)* | `38 đặc trưng` | 28 máy chủ theo dõi 38 đặc trưng (CPU, RAM, Disk, Network...) suốt 5 tuần; tỷ lệ lỗi Test `4.21%`; trung vị mỗi đoạn lỗi tác động đồng thời lên **4 đặc trưng**. | • `VUS-ROC`: `0.8163` $\rightarrow$ **`0.823 ± 0.005`** *(vượt Paper `0.813`)*<br>• `VUS-PR`: `0.3569` $\rightarrow$ **`0.374 ± 0.013`** *(vượt Paper `0.366`)*<br>• `RF`: `0.2290` $\rightarrow$ **`0.239 ± 0.009`** *(vượt Paper `0.235`)* |
+| **`AIOps / IOPS`** *(29 thực thể)* | `1 đặc trưng` | 29 chuỗi KPI web đám mây đơn biến; tập Train **bị nhiễm bẩn sẵn `2.49%` lỗi thật** (9/29 chuỗi nhiễm bẩn $>5\%$). | • `VUS-ROC`: `0.9286` $\rightarrow$ **`0.926 ± 0.004`** *(vượt Paper `0.911`)*<br>• `VUS-PR`: `0.4596` $\rightarrow$ **`0.458 ± 0.009`** *(vượt Paper `0.448`)*<br>• `RF`: `0.1899` $\rightarrow$ **`0.180 ± 0.007`** *(vượt Paper `0.179`)* |
+| **`MSL`** *(23 thực thể)* | `55 đặc trưng` | 23 thực thể tàu tự hành Sao Hỏa NASA (`13.01%` lỗi Test); trung bình `41.9/54` đặc trưng lệnh giữ hằng số nên dễ sinh *False Anomaly*. | • `VUS-ROC`: `0.7152` $\rightarrow$ **`0.731 ± 0.017`** *(Paper `0.753`)*<br>• `VUS-PR`: `0.4307` $\rightarrow$ **`0.469 ± 0.022`** *(sát Paper `0.482`)*<br>• `RF`: `0.2205` $\rightarrow$ **`0.244 ± 0.024`** *(sát Paper `0.254`)* |
+| **`SMAP`** *(49 thực thể)* | `25 đặc trưng` | Vệ tinh đo độ ẩm đất NASA (`11.14%` lỗi Test); gộp chung các thực thể khi train 1 model chia sẻ vì mỗi chuỗi chỉ dài ~2,752 điểm. | • `VUS-ROC`: `0.6401` $\rightarrow$ **`0.628 ± 0.016`** *(Paper `0.642`)*<br>• `VUS-PR`: `0.3373` $\rightarrow$ **`0.329 ± 0.015`** *(Paper `0.360`)*<br>• `RF`: `0.1407` $\rightarrow$ **`0.142 ± 0.020`** *(Paper `0.196`)* |
+| **`UCR`** *(250 thực thể)* | `1 đặc trưng` | 250 chuỗi đa lĩnh vực (ECG, ABP, EPG...); tập Train sạch 0% lỗi, **77.7% đoạn lỗi nằm gọn trong biên độ bình thường** (*lỗi hình thái*). | • `VUS-ROC`: **`0.8970`** *(chuẩn Paper `0.897`)*<br>• `VUS-PR`: **`0.4920`** *(chuẩn Paper `0.492`)*<br>• `RF`: **`0.2340`** *(chuẩn Paper `0.234`)* |
 
 ---
 
 ### Thao tác 1.2: Khối giữa bên trái — `Thông số cấu hình mô hình`
-* **Hành động:** Chỉ chuột qua từng ô trong bảng cấu hình của `machine-1-1`.
-* **Ý nghĩa từng con số:**
-  1. **`Trạng thái nạp: Model đã nạp trong bộ nhớ`** (Huy hiệu xanh): Xác nhận checkpoint trọng số thực tế (`bestmodel.pkl`) đã nạp vào PyTorch trên CPU.
-  2. **`Mô hình: ConvAEC (Convolutional Autoencoder + NonLinear Classifier)`**: Kiến trúc tích chập 1 chiều kết hợp bộ phân loại MLP phi tuyến.
-  3. **`Số lớp phân loại: 12 (1 normal + 11 synthetic anomalies)`**: Gồm lớp `0` (*Normal*) và 11 lớp bất thường giả sinh tự động.
-  4. **`Số chiều (n_features): 38`**: Chính là `dims = 38` cảm biến đầu vào tại mỗi mốc thời gian $t$ (đã chuẩn hóa Min-Max về `[0, 1]` theo tập Train).
-  5. **`Kích thước cửa sổ (W): 100`**: Mỗi lần mô hình nhìn 1 đoạn dài 100 bước thời gian liên tiếp $\rightarrow$ ma trận đầu vào có kích thước `100 × 38` (3,800 con số).
-  6. **`Bước trượt (Step): 10`**: Lúc huấn luyện trượt 10 bước/lần để giảm dư thừa dữ liệu; lúc kiểm thử trượt từng bước một (`stride = 1`) để chấm điểm toàn bộ chuỗi.
-  7. **`Chiều Embedding: 128`**: Dù đầu vào là `1 dim` hay `55 dims`, khối `Encoder` luôn nén toàn bộ cửa sổ 100 bước về cố định **128 đặc trưng ẩn** ở cổ chai (*bottleneck*).
+* **Hành động:** Chỉ chuột qua từng ô trong bảng cấu hình mô hình (`RedLamp/models/meta.py`, `cnn.py`, `classifier.py`).
+* **Giải thích chi tiết từng thông số:**
+  1. **`Trạng thái nạp: Model đã nạp trong bộ nhớ`** (Huy hiệu xanh): Xác nhận bộ trọng số đã huấn luyện (`bestmodel.pkl`, ~4.6 MB) đã được PyTorch nạp vào RAM để sẵn sàng suy luận trực tiếp.
+  2. **`Mô hình: ConvAEC (Convolutional Autoencoder + NonLinear Classifier)`**: Kiến trúc **Đa tác vụ (Multi-task)** chữ **Y** gồm 1 thân chung và 2 nhánh đầu ra:
+     * **Thân chung `ConvEncoder`:** Gồm **4 khối tích chập 1 chiều (`Conv1D`)** (`num_filters = [128, 128, 256, 256]`, `kernel_size = 4`, `stride = 2`, `BatchNorm1d`, `ReLU`, `Dropout = 0.2`) + `MaxPool1d` + `Conv1x1` để trích xuất hình thái cục bộ và nén chiều thời gian từ `100 → 51 → 26 → 14 → 8 → 1`.
+     * **Nhánh 1 — `ConvDecoder` (Autoencoder tái tạo):** Dùng `Linear(1 → 8)` + **4 khối tích chập chuyển vị (`ConvTranspose1d`)** `[256, 256, 128, 128]` + `Conv1x1` để giải nén ngược từ vector `128` chiều về lại cửa sổ `[100 × D]`, tính sai số tái tạo **`MSE`**.
+     * **Nhánh 2 — `NonLinear Classifier` (Bộ phân loại MLP phi tuyến):** Mạng `Linear(128 → 32) → BatchNorm1d → ReLU → Dropout(0.1) → Linear(32 → 12) → Softmax`, ép không gian ẩn phải tách biệt rạch ròi vùng bình thường và 11 kiểu biến dạng.
+  3. **`Số lớp phân loại: 12 (1 normal + 11 synthetic anomalies)`**: Gồm lớp `0` (*Normal — Bình thường*) và **11 lớp bất thường giả tự sinh** (*Spike, Flip, Speedup, Noise, Cutoff, Average, Scale, Wander, Contextual, Upside-down, Mixture*).
+  4. **`Số đặc trưng (n_features = D)`**: Số lượng cảm biến/đặc trưng đo đồng thời tại mỗi bước thời gian $t$ (`SMD = 38`, `MSL = 55`, `SMAP = 25`, `AIOps = 1`, `UCR = 1`), đã chuẩn hóa Min-Max về `[0, 1]` theo tập Train.
+  5. **`Kích thước cửa sổ (W = 100)`**: Một điểm đơn lẻ không đủ ngữ cảnh để kết luận bất thường (ví dụ lỗi *Wander*, *Speedup*, *Cutoff*). Mô hình luôn cắt một đoạn trượt dài **100 mốc thời gian liên tiếp** $\rightarrow$ ma trận đầu vào của 1 cửa sổ có kích thước **`100 × D`** (với `SMD` là `100 × 38 = 3,800` con số).
+  6. **`Bước trượt (Step = 10 khi Train | Stride = 1 khi Test)`**:
+     * **Khi Train (`Step = 10`):** Cửa sổ sau dịch cách cửa sổ trước 10 mốc thời gian (`[0..99]`, `[10..109]`, `[20..119]`...) để giảm 10 lần thời gian huấn luyện và tránh học lặp các cửa sổ quá giống nhau *(riêng UCR ngắn nên dùng `Step = 1`)*.
+     * **Khi Test (`Stride = 1`):** Trượt từng bước thời gian một để chấm điểm bất thường cho mọi thời điểm $t$ trên chuỗi kiểm thử.
+  7. **`Chiều Embedding (128)`**: Nút cổ chai (*Bottleneck*) ở giữa mạng. Dù cửa sổ đầu vào có `100 × 1 = 100` số hay `100 × 55 = 5,500` số, khối `Encoder` luôn ép toàn bộ cửa sổ về đúng **1 vector 128 con số (`[128, 1]`)**. Việc ép qua cổ chai 128 chiều buộc mạng chỉ giữ lại quy luật cốt lõi của tín hiệu chuẩn và không thể "copy nguyên xi" điểm lỗi từ đầu vào sang đầu ra.
+  8. **`Đường dẫn model (`bestmodel.pkl`)`**: Đường dẫn tới file trọng số đạt `valid_loss` thấp nhất trong quá trình huấn luyện (khi chọn `ALL` sẽ hiển thị đường dẫn model của thực thể mẫu đại diện như `machine-1-1`).
 
 ---
 
 ### Thao tác 1.3: Khối giữa bên phải — `Kết quả đánh giá chất lượng (Metrics)`
-* **Số liệu thực tế hiện trên màn hình (`SMD / machine-1-1 / Seed 0`):**
+* **Số liệu khi chọn `ALL (Trung bình cả 28 thực thể)` của `SMD` (Khớp 100% Table 4 Báo cáo nhóm):**
+  * **`VUS-ROC`**: **`0.8163`** *(Seed 0)* — Dòng phụ: **`Trung bình 5 seed: 0.823 ± 0.005`** *(Bài báo gốc: `0.813`)*
+  * **`VUS-PR`**: **`0.3569`** *(Seed 0)* — Dòng phụ: **`Trung bình 5 seed: 0.374 ± 0.013`** *(Bài báo gốc: `0.366`)*
+  * **`RF (Range F-score)`**: **`0.2290`** *(Seed 0)* — Dòng phụ: **`Trung bình 5 seed: 0.239 ± 0.009`** *(Bài báo gốc: `0.235`)*
+* **Số liệu khi chuyển sang 1 thực thể cụ thể (`SMD / machine-1-1 / Seed 0`):**
   * **`VUS-ROC`**: **`0.9628`** *(Dòng phụ: `Trung bình 5 seed: 0.969 ± 0.006`)*
   * **`VUS-PR`**: **`0.6988`** *(Dòng phụ: `Trung bình 5 seed: 0.752 ± 0.036`)*
   * **`RF (Range F-score)`**: **`0.5383`** *(Dòng phụ: `Trung bình 5 seed: 0.565 ± 0.025`)*
 * **Cách giải thích sâu sắc từng chỉ số:**
   * **Tại sao loại bỏ `F1-PA` (Point Adjustment) cũ?** `F1-PA` chỉ cần đoán trúng 1 giây trong sự cố kéo dài 100 giây là tính đúng cả 100 giây, khiến điểm số ngẫu nhiên cũng đạt F1 cao giả tạo. Do đó nhóm tự xây dựng bộ chấm điểm theo khoảng (*Range-based*) trên thư viện `TSB-AD`.
-  * **`VUS-ROC = 0.9628` (`0.969 ± 0.006`):** *Volume Under the Surface* mở rộng biên đoạn lỗi bằng vùng đệm (buffer tối đa $W/2 = 50$ bước) và tính thể tích dưới mặt cong ROC trên mọi ngưỡng cắt và mọi độ dài vùng đệm. Con số `0.969` sát mức hoàn hảo `1.0` cùng độ lệch chuẩn siêu nhỏ `± 0.006` qua 5 hạt giống độc lập (`Seed 0..4`) chứng minh độ ổn định rất cao.
-  * **`VUS-PR = 0.6988` (`0.752 ± 0.036`) — Thước đo chính của KDD '25:** Vì lỗi ngoài thực tế rất hiếm (`0.85% – 13%`), `ROC` chia báo động giả cho số điểm bình thường khổng lồ nên dễ cao ảo; ngược lại **`VUS-PR` (Precision-Recall)** phạt cực nặng mọi báo động giả. Đạt trung bình `0.752` trên máy chủ 38 chiều không nhãn là mức hiệu năng rất mạnh.
-  * **`RF = 0.5383` (`0.565 ± 0.025`):** Điểm F1 tính trên cấp độ phân đoạn tại ngưỡng $\mu + 3\sigma$, có trừ điểm phạt nếu một sự cố liền mạch bị phát hiện vụn vặt đứt đoạn.
+  * **`VUS-ROC = 0.8163` (`0.823 ± 0.005` trên `ALL` | `0.969 ± 0.006` trên `machine-1-1`):** *Volume Under the Surface* mở rộng biên đoạn lỗi bằng vùng đệm (buffer tối đa $W/2 = 50$ bước) và tính thể tích dưới mặt cong ROC trên mọi ngưỡng cắt và mọi độ dài vùng đệm. Điểm trung bình 28 máy đạt `0.823 ± 0.005` (vượt bài báo gốc `0.813`) cùng độ lệch chuẩn siêu nhỏ qua 5 hạt giống độc lập (`Seed 0..4`) chứng minh độ ổn định rất cao.
+  * **`VUS-PR = 0.3569` (`0.374 ± 0.013` trên `ALL` | `0.752 ± 0.036` trên `machine-1-1`) — Thước đo chính của KDD '25:** Vì lỗi ngoài thực tế rất hiếm (`0.85% – 13%`), `ROC` chia báo động giả cho số điểm bình thường khổng lồ nên dễ cao ảo; ngược lại **`VUS-PR` (Precision-Recall)** phạt cực nặng mọi báo động giả. Nhóm đạt trung bình toàn tập `0.374 ± 0.013`, vượt kết quả bài báo gốc (`0.366`).
+  * **`RF = 0.2290` (`0.239 ± 0.009` trên `ALL` | `0.565 ± 0.025` trên `machine-1-1`):** Điểm F1 tính trên cấp độ phân đoạn tại ngưỡng $\mu + 3\sigma$, có trừ điểm phạt nếu một sự cố liền mạch bị phát hiện vụn vặt đứt đoạn (vượt bài báo gốc `0.235`).
 
 ---
 
 ### Thao tác 1.4: Khối dưới cùng — `Tổng quan toàn bộ chuỗi thời gian của Entity`
-* **Giải thích biểu đồ:**
-  * **Trục ngang (`t`):** Toàn bộ chuỗi kiểm thử dài **`28,381` bước thời gian** của `machine-1-1`.
-  * **Đường xám đậm (`Chuỗi đo lường - Chiều 1`):** Giá trị cảm biến đầu tiên `D1` (dao động nền quanh `0.05 – 0.25`).
-  * **Đường đỏ (`Điểm bất thường tương đối` — `anomaly_score`):** Điểm kết hợp cuối cùng theo Công thức (8) sau khi làm mượt 50 bước và chuẩn hóa Min-Max về `[0, 1]`.
-  * **Điểm nhấn chỉ tay trên máy chiếu:** Ở các đoạn máy chạy bình thường (ví dụ quanh `t = 5,858`), đường đỏ nằm sát rạt đáy `0.00`. Tại vùng sự cố lớn (đỉnh cực đại tại **`t = 17,407`** chạm `1.00`), đường đỏ dựng vọt thẳng đứng tách biệt rõ rệt!
+* **Giải thích chi tiết các thành phần của biểu đồ:**
+  * **Ô chọn `Đặc trưng:` (Góc trên bên phải biểu đồ, cạnh nút `Tải PNG`):**
+    * Mặc định chọn **`Đặc trưng D1`** và cho phép chuyển đổi trực tiếp sang bất kỳ đặc trưng nào từ **`Đặc trưng D1`** đến **`Đặc trưng D38`** (`MSL`: `D1..D55`, `SMAP`: `D1..D25`; với các tập 1 đặc trưng như `AIOps` và `UCR`, ô chọn này tự động ẩn đi).
+  * **Trục ngang (`Chỉ số thời gian t`):** Toàn bộ dòng thời gian tập Test dài **`28,381` bước** (mỗi bước = 1 phút $\approx$ 20 ngày theo dõi liên tục) của máy đại diện `machine-1-1`.
+  * **Trục dọc (`0.00` → `1.00`):** Thang đo chuẩn hóa `[0, 1]` dùng chung cho cả giá trị đặc trưng lẫn điểm bất thường.
+  * **Đường màu xanh đậm (`Tín hiệu gốc` — theo Đặc trưng đang chọn):**
+    * **`Đặc trưng D1..D38` là gì?** Vì các bộ dữ liệu công nghiệp ẩn danh tên thật của cảm biến (không có dòng tiêu đề Header), 38 cột cảm biến của 1 thực thể được đánh số thứ tự từ **`D1` đến `D38`** (khớp 100% với nhãn của 38 ô nhập số `D1..D38` ở Tab 2!).
+    * **Tại sao các đặc trưng `D1..D38` được chuẩn hóa về `[0, 1]`?** Ngoài thực tế, 38 cảm biến có đơn vị hoàn toàn khác nhau (CPU tính bằng `%`, RAM tính bằng `MB`, Lưu lượng mạng tính bằng hàng triệu `Bytes/s`). Nếu để số thô, khi tính sai số tái tạo `MSE`, cảm biến nào có đơn vị hàng triệu sẽ nuốt chửng các cảm biến số nhỏ. Do đó, toàn bộ các chiều đều được chuẩn hóa **Min-Max về `[0, 1]`** theo tập Train: $x_{\text{norm}} = \frac{x - x_{\min}}{x_{\max} - x_{\min}}$ để mọi cảm biến có trọng số đóng góp công bằng như nhau *(trên tập Test đôi khi đỉnh vọt nhẹ lên `1.08` nếu lúc sự cố giá trị vượt mức cực đại từng thấy ở tập Train)*.
+  * **Đường màu đỏ (`Điểm bất thường tương đối` — `anomaly_score`):**
+    * Là điểm cảnh báo lỗi của mô hình RedLamp chấm trên **toàn bộ cả 38 chiều (`D1..D38`) cùng lúc**, đã được chuẩn hóa về **`[0, 1]`** (`0.00` = bình thường tuyệt đối, `1.00` = điểm lỗi nặng nhất toàn chuỗi).
+    * **Tại sao Đường đỏ cũng phải chuẩn hóa về `[0, 1]`?** Trong Công thức (8) của bài báo KDD '25 (`RedLamp/main.py`), điểm bất thường được tổng hợp từ 2 nhánh có đơn vị khác nhau: nhánh `Decoder` xuất ra sai số **`MSE`** (thang đo mở `[0, ∞)`) và nhánh `Classifier` xuất ra tổng xác suất lớp lỗi **`CE`** (thang đo `[0, 1]`). Sau khi làm mượt trung bình trượt 50 bước, thuật toán bắt buộc phải **chuẩn hóa Min-Max từng nhánh về `[0, 1]`** rồi mới cộng trung bình:
+      $$\text{Score}(t) = \frac{\widetilde{\text{MSE}}_{[0,1]}(t) + \widetilde{\text{CE}}_{[0,1]}(t)}{2} \in [0, 1]$$
+      Việc quy về `[0, 1]` mang lại **3 lợi ích**: **(1)** Giúp 2 nhánh `MSE` và `Classifier` có quyền biểu quyết ngang nhau 50%–50% mà không nhánh nào lấn át nhánh nào; **(2)** Định vị ngay `0.00` là lúc hệ thống êm nhất và `1.00` là đỉnh sự cố nghiêm trọng nhất chuỗi; **(3)** Cho phép vẽ chồng Đường đỏ lên chung một trục tung `[0, 1]` với Đường xanh đậm `D1` để mắt người đối chiếu trực tiếp.
+  * **Cách chỉ tay đọc 3 vùng trên máy chiếu (từ trái qua phải):**
+    1. **Nửa bên trái (Máy chạy ổn định):** Đường màu xanh đậm dao động nhịp nhàng theo chu kỳ ở mức thấp (`0.05 – 0.25`); đường màu đỏ nằm **sát rạt đáy `0.00`** $\rightarrow$ mô hình hiểu đây là nhịp tải bình thường, không báo động giả.
+    2. **Chính giữa biểu đồ (Đỉnh sự cố lớn nhất tại `t = 17,407`):** Khi tín hiệu máy chủ vọt bất thường lên đỉnh cao, **đường màu đỏ dựng vọt thẳng đứng chạm `1.00`** (cột nhọn cao nhất giữa hình) $\rightarrow$ bắt trúng thời điểm sự cố nghiêm trọng nhất (đây cũng là mốc `t = 17,407` được phóng to ở Tab 3).
+    3. **Nửa bên phải (Các đợt lỗi lặp lại):** Mỗi khi tín hiệu xanh đậm rối loạn biên độ (`~0.50`), đường đỏ lập tức dâng cao ôm khít vùng lỗi và hạ ngay về `0.00` khi máy êm trở lại. *(Lưu ý ăn điểm phản biện: Có chỗ đường xanh đậm `Chiều 1` chỉ nhích nhẹ nhưng đường đỏ vẫn vọt cao là vì sự cố lúc đó đang nổ ra ở các chiều khác trong 37 chiều còn lại `D2..D38`, và mô hình đa biến 38 chiều vẫn bắt trúng!).*
 
 ---
 
@@ -132,7 +150,7 @@ Khi mở trang web, hệ thống nạp sẵn **`SMD (Server Machine Dataset - 38
 
 ### Bước 3/5 (~0.5 phút): `Mạng giải mã tái tạo (Decoder) & Sai số bình phương`
 * **Hành động:** Bấm phím **`→`** sang Bước 3. Đối chiếu 2 biểu đồ đặt song song cùng thang đo:
-  * **Bên trái — `Cửa sổ đang xét (t=17407)`:** Đường `Gốc` (xám đậm) vọt lệch hẳn khỏi đường `Tái tạo` của Decoder (xanh dương) $\rightarrow$ Huy hiệu đỏ báo **`MSE = 0.1230`**.
+  * **Bên trái — `Cửa sổ đang xét (t=17407)`:** Đường `Gốc` (xanh đậm) vọt lệch hẳn khỏi đường `Tái tạo` của Decoder (xanh dương) $\rightarrow$ Huy hiệu đỏ báo **`MSE = 0.1230`**.
   * **Bên phải — `Cửa sổ bình thường đối chứng (t=5858)`:** Đường `Tái tạo` bám khít đường `Gốc` $\rightarrow$ Huy hiệu báo **`MSE = 0.0005`** (`0.000543`).
 * **Điểm nhấn toán học:** Sai số tái tạo tại đỉnh lỗi cao **gấp ~226 lần** cửa sổ bình thường! Nhờ cơ chế **Mặt nạ che lỗi `Anomaly Mask` ($1 - W$)** ở Công thức (2) nhân vùng lỗi giả với `0` lúc train, Decoder tuyệt đối không học vẹt lỗi mà chỉ biết vẽ lại trạng thái bình thường.
 
@@ -154,7 +172,7 @@ Khi mở trang web, hệ thống nạp sẵn **`SMD (Server Machine Dataset - 38
 
 ### Bước 5/5 (~0.5 phút): `Điểm kết hợp & Công thức tính điểm cuối cùng`
 * **Hành động:** Bấm phím **`→`** sang Bước 5.
-* **Biểu đồ phía trên:** Gồm 3 đường theo thời gian (`Điểm tái tạo MSE` màu xám đậm, `Điểm phân loại CE` màu xanh dương, `Điểm thô kết hợp` màu đỏ đậm) cắt vọt qua đường kẻ ngang nét đứt đỏ **`Ngưỡng: 0.505`**.
+* **Biểu đồ phía trên:** Gồm 3 đường theo thời gian (`Điểm tái tạo MSE` màu xanh đậm, `Điểm phân loại CE` màu xanh dương, `Điểm thô kết hợp` màu đỏ đậm) cắt vọt qua đường kẻ ngang nét đứt đỏ **`Ngưỡng: 0.505`**.
 * **Hộp `CÔNG THỨC KẾT HỢP VỚI SỐ LIỆU THỰC TẾ` ở bên dưới:** Hiện trực tiếp phép tính tại `t = 17,407`:
   $$\text{Điểm cuối} = \frac{\text{Điểm tái tạo} + \text{Điểm phân loại}}{2} = \frac{0.1230 + 0.9999}{2} = \mathbf{0.5615} \quad \left(\text{Ngưỡng P99.5} = 0.5045 \implies \textbf{BẤT THƯỜNG}\right)$$
 * **Ý nghĩa chốt lại:** Dù riêng `MSE` tại đây chỉ ở mức vừa phải (`0.1230`), nhánh `Classifier` đã bắt trúng hình thái biến dạng với độ tự tin `0.9999`, kéo điểm kết hợp lên **`0.5615 > 0.5045`** để bắt gọn sự cố!
@@ -191,7 +209,7 @@ Bạn có thể chọn **1 trong 2 phương án** dưới đây (đã kiểm ch�
    * Kết luận đổi sang **ĐỎ RỰC**: **`PHÁT HIỆN BẤT THƯỜNG`** (*"Điểm kết hợp thô (0.5164) vượt ngưỡng quy định (0.5045)"*).
    * Thẻ Phân loại 12 nhóm báo **ĐỎ**: **`Đỉnh nhọn (Spike) (spike) - 99.9%`** — *"Biến động tăng/giảm biên độ đột biến cục bộ tại 1-2 điểm"*.
    * 4 ô điểm số: `MSE = 0.0329` (tăng **47 lần**!) | `CE = 1.0000` (`100%`!) | `Điểm kết hợp thô = 0.5164` > `Ngưỡng P99.5 = 0.5045`.
-   * Đồ thị góc dưới phải: Tại `t = 100`, đường gốc (xám đậm) vọt thẳng đứng lên `5.0`, tách hẳn khỏi đường tái tạo Autoencoder (xanh dương)!
+   * Đồ thị góc dưới phải: Tại `t = 100`, đường gốc (xanh đậm) vọt thẳng đứng lên `5.0`, tách hẳn khỏi đường tái tạo Autoencoder (xanh dương)!
 
 #### Phương án B (Chuyển ở Tab 1 sang `AIOps / IOPS (1 dim)` — Gõ đúng 1 ô duy nhất + Show luôn bảng FAA)
 1. **Hành động:** Chọn `AIOps / IOPS (1 dim)` (tự nạp `KPI-05f10d3a...`, 1 ô nhập mặc định trung vị `0.3603` báo `BÌNH THƯỜNG` với điểm `0.0001 < 0.5010`). Sửa ô đó thành **`5.0`** $\rightarrow$ Bấm **`⚡ Thực hiện dự đoán bất thường`**.
