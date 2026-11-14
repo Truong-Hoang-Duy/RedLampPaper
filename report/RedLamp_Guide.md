@@ -46,13 +46,13 @@
 | **t-SNE / PCA** | *t-Distributed Stochastic Neighbor Embedding / Principal Component Analysis* | Thuật toán giảm chiều dữ liệu (từ 128D xuống 2D) | "Ép phẳng" không gian 128 chiều của `Embedding` xuống mặt phẳng 2D ($x, y$) để vẽ biểu đồ phân cụm trực quan. |
 | **XAI** | *Explainable Artificial Intelligence* | AI có khả năng giải thích | Không chỉ phán "Có lỗi!", AI còn chỉ ra được **"Lỗi này có hình thái giống lỗi nhiễu sóng (Noise), đảo cực (Flip) hay kẹt cảm biến (Cutoff)"**. |
 
-## 1.4. Bảng Phân Biệt Nhanh 4 Thuật Ngữ Dễ Nhầm Lẫn Nhất Khi Hội Đồng Hỏi
+## 1.4. Bảng Phân Biệt Nhanh 4 Thuật Ngữ Dễ Nhầm Lẫn Nhất Khi Thuyết Trình & Hỏi Đáp
 
 | Thuật ngữ | Bản chất | Xuất hiện lúc nào? | Giải thích trong 1 câu | Hậu quả nếu không xử lý | Vũ khí của REDLAMP |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **`False Anomaly`** *(Lớp giả bình thường)* | **Mẫu dữ liệu** nhân tạo | Lúc **Huấn luyện** | Biến đổi tín hiệu tạo lỗi giả (như `average`), nhưng kết quả trông **vẫn giống hệt bình thường**. | Tăng **FPR** *(Báo động giả)* | **Nhãn mềm ($\alpha=0.1$)** lúc học & **Bộ lọc FAA ($> 0.05$)** lúc kiểm thử. |
 | **`Anomaly Contamination`** *(Nhiễm bẩn bất thường)* | **Mẫu dữ liệu** thực tế | Lúc **Huấn luyện** | Tập Train chưa gán nhãn bị **lẫn sẵn lỗi thật** nhưng máy tưởng là bình thường. | Tăng **FNR** *(Bỏ sót lỗi thật)* | **11 lớp biến đổi đa dạng** + **Nhãn mềm ($\beta=0.01$)** + **Mặt nạ tái tạo ($W$)**. |
-| **`Điểm kết hợp thô (raw_combined)`** | **Điểm số suy luận** | Lúc **Dự đoán & Giải thích** | Trung bình cộng $(\text{MSE} + \text{CE}) / 2$ chưa qua chuẩn hóa Min-Max. | Không bị kéo đỉnh giả lên `1.0` khi chuỗi sạch | Đối chiếu trực tiếp với ngưỡng phân vị **`P99.5`** ở Tab 2 & Bước 5 Tab 3 của Demo. |
+| **`Điểm kết hợp thô (raw_combined)`** | **Điểm số suy luận** | Lúc **Dự đoán & Giải thích** | Trung bình cộng $(\text{MSE} + \text{CE}) / 2$ chưa qua chuẩn hóa Min-Max. | Không bị kéo đỉnh giả lên `1.0` khi chuỗi sạch | Đối chiếu trực tiếp với ngưỡng phân vị **`P99.5`** ở Tab 3 & Bước 5 Tab 2 của Demo. |
 | **`Điểm bất thường tương đối (anomaly_score)`** | **Điểm chuẩn hóa `[0, 1]`** | Lúc **Đánh giá toàn chuỗi** | Điểm kết hợp sau khi làm mượt 50 bước và chuẩn hóa Min-Max trên toàn chuỗi Test. | Luôn có đỉnh cực đại bằng `1.0` trên mỗi chuỗi | Vẽ đường đỏ tổng quan ở Tab 1 và dùng để chấm **`VUS-ROC`**, **`VUS-PR`**, **`RF`**. |
 
 ## 1.5. Năm Bộ Dữ Liệu Chuẩn Trong Bài Báo & Kết Quả Tái Lập Của Nhóm
@@ -139,7 +139,7 @@ Giả sử đoạn sóng gốc gồm 6 điểm: `[10, 12, 14, 16, 18, 20]`, máy
 | **`2` / $k=3$** | **`flip`** | $X_{\text{dim},\text{st}:\text{ed}}^{(t)}[::-1]$ | Lật ngược thứ tự thời gian đầu–đuôi: `[10, 12, 18, 16, 14, 20]`. |
 | **`3` / $k=4$** | **`speedup`** | Lấy mẫu `[::2]` ($2\times$) hoặc giãn nội suy ($0.5\times$) | Tua nhanh gấp đôi hoặc làm chậm một nửa tần số nhịp điệu sóng trong đoạn `[st:ed]`. |
 | **`4` / $k=5$** | **`noise`** | $X_{\text{dim},\text{st}:\text{ed}}^{(t)} + a, \; a \sim \mathcal{N}(0, 0.1I)$ | Cộng nhiễu trắng Gaussian làm đường sóng răng cưa lăn tăn: `[10, 12, 14.3, 15.6, 18.4, 20]`. |
-| **`5` / $k=6$** | **`cutoff`** | $\text{Uni}(\min, \max)$ hằng số | Cắt cụt thành vạch ngang phẳng lì ở một mức cố định: `[10, 12, 15, 15, 15, 20]`. |
+| **`5` / $k=6$** | **`cutoff`** | $\text{Uni}(\min, \max)$ hằng số | Chặn ngưỡng (`Clipping / Saturation`) thành đường ngang ở một mức cố định: `[10, 12, 15, 15, 15, 20]`. |
 | **`6` / $k=7$** | **`average`** | $\text{MovingAverage}(w = L/5 = 20)$ | Làm trơn/san phẳng các dao động chi tiết bằng trung bình trượt 20 điểm. |
 | **`7` / $k=8$** | **`scale`** | $a \times X_{\text{dim},\text{st}:\text{ed}}^{(t)}, \; a \sim \mathcal{N}(1, 1)$ | Phóng đại hoặc thu nhỏ biên độ (ví dụ $a=2 \to$ `[10, 12, 28, 32, 36, 20]`). |
 | **`8` / $k=9$** | **`wander`** | Cộng `linspace(0, a)` rồi giữ độ lệch $+a$ đến cuối | Trôi đường cơ sở (*Baseline Drift*): đoạn sau cũng bị kênh lên $+a$, nên **$W = 1$ từ `st` đến tận cuối cửa sổ!** |
@@ -180,7 +180,7 @@ Giả sử đoạn sóng gốc gồm 6 điểm: `[10, 12, 14, 16, 18, 20]`, máy
 * **Lưu ý quan trọng:** Dù dữ liệu đa biến có tới `38 dims` (như `SMD`), mỗi kính lúp `kernel = 4` có kích thước `4 × 38` ôm trọn cả 38 cảm biến cùng lúc và **chỉ trượt theo 1 hướng duy nhất là trục thời gian**, nên vẫn gọi là **`1D-CNN`**.
 
 ### 2) Cấu trúc 3 khối của mạng `ConvAEC` (`RedLamp/models/meta.py` & `cnn.py`)
-1. **`ConvEncoder`:** Đưa cửa sổ `[1, 100, D]` qua 4 khối `ConvBlock` (`filters = [128, 128, 256, 256]`, `kernel = 4`, `stride = 2`, `padding = 2`, `BatchNorm1d`, `ReLU`, `Dropout = 0.2`) nén dần độ dài thời gian `100 -> 51 -> 26 -> 14 -> 8`, sau đó qua `Global MaxPool1D` (về `[1, 256, 1]`) và `Conv1x1` tạo ra **véc-tơ `Embedding` 128 chiều (`[1, 128, 1]`)**.
+1. **`ConvEncoder`:** Đưa cửa sổ `[1, 100, D]` qua 4 khối `ConvBlock` (`filters = [128, 128, 256, 256]`, `kernel = 4`, `stride = 2`, `padding = 2`, `BatchNorm1d`, `ReLU`, `Dropout = 0.2`) nén dần độ dài thời gian `100 -> 51 -> 26 -> 14 -> 8`, sau đó qua `Global MaxPool1D` (về `[1, 256, 1]`) và `Conv1x1` tạo ra **`Bottleneck` `Vector Embedding` 128 chiều (`[1, 128, 1]`)**.
 2. **`ConvDecoder`:** Nén ngược từ `Embedding 128 chiều` qua tầng `Linear` upsampling, 4 khối `ConvTranspose1d` đối xứng `[256, 256, 128, 128]` và `Conv1x1` để khôi phục cửa sổ $\hat{X} \in \mathbb{R}^{1 \times 100 \times D}$.
 3. **`NonLinear Classifier`:** Từ cùng `Embedding 128 chiều`, đi qua mạng MLP 2 tầng (`Linear(128 -> 32)` $\to$ `BatchNorm` $\to$ `ReLU` $\to$ `Dropout` $\to$ `Linear(32 -> 12)` $\to$ `Softmax`) dự đoán phân phối xác suất 12 lớp $\hat{y} \in \mathbb{R}^{1 \times 12}$.
 
@@ -254,15 +254,15 @@ $$\tilde{y}_i^{(t,k)} = \begin{cases} (1 - \alpha - K\beta)y_i^{(t,k)} + \alpha 
 
 # PHẦN 7: TỔNG QUAN 3 TAB CỦA ỨNG DỤNG WEB DEMO (`REDLAMP DEMO`)
 
-Khi khởi chạy [`../run_demo.bat`](../run_demo.bat) (mở `http://127.0.0.1:8000`), giao diện Web Demo gồm **3 Tab trên thanh Header** tương ứng với 3 chức năng cốt lõi:
+Khi khởi chạy [`../run_demo.bat`](../run_demo.bat) (mở `http://127.0.0.1:8000`), giao diện Web Demo gồm **3 Tab trên thanh Header** sắp xếp theo đúng luồng thuyết trình từ tổng quan đến cơ chế và thực nghiệm:
 
-1. **Tab 1 — `1. Chọn Pretrain & Mô hình`:**
-   * Chọn 1 trong 5 bộ dữ liệu (`SMD`, `AIOps / IOPS`, `MSL`, `SMAP`, `UCR`), chọn `Entity` và `Seed (0 - 4)`.
-   * Xem bảng **Thông số cấu hình mô hình** (`ConvAEC`, `dims`, `W = 100`, `Embedding = 128`), bảng **3 chỉ số đánh giá thực tế (`VUS-ROC`, `VUS-PR`, `RF` kèm `mean ± std` của 5 seeds)** và **Biểu đồ tổng quan toàn chuỗi thời gian**.
-2. **Tab 2 — `2. Nhập điểm & Dự đoán` (Live Inference):**
-   * Ghép 1 điểm dữ liệu mới nhập tay (`1` hoặc `D` chiều) vào sau 99 điểm ngữ cảnh trước đó, điều chỉnh ngưỡng quyết định (mặc định phân vị `P99.5`) và chạy mô hình `ConvAEC` thời gian thực.
-   * Xuất ngay kết luận **`TRẠNG THÁI BÌNH THƯỜNG`** / **`PHÁT HIỆN BẤT THƯỜNG`**, nhóm bất thường giả tương đồng nhất, 4 thẻ điểm thô (`MSE`, `CE`, `Điểm kết hợp thô`, `Ngưỡng P99.5`), bảng các lớp bị loại bởi FAA, đồ thị tái tạo cửa sổ 100 điểm và nút **`🔍 Xem giải thích cho điểm này (Đồng bộ)`**.
-3. **Tab 3 — `3. Trình bày Giải thích` (Walkthrough 5 Bước XAI):**
+1. **Tab 1 — `1. Tổng quan`:**
+   * Chọn 1 trong 5 bộ dữ liệu (`SMD`, `AIOps / IOPS`, `MSL`, `SMAP`, `UCR`), chọn `Entity` (bao gồm cả `ALL` trung bình toàn tập) và `Seed (0 - 4)`.
+   * Xem bảng **Thông số cấu hình mô hình** (`ConvAEC`, `n_features`, `W = 100`, `Embedding = 128`), bảng **3 chỉ số đánh giá thực tế (`VUS-ROC`, `VUS-PR`, `RF` kèm `mean ± std` của 5 seeds)** và **Biểu đồ tổng quan toàn chuỗi thời gian** (hỗ trợ chọn từng đặc trưng `D1..Dn`).
+2. **Tab 2 — `2. Giải thích mô hình` (Walkthrough 5 Bước XAI):**
    * Trình chiếu trực quan từng bước bên trong mạng (hỗ trợ phím mũi tên `←` / `→`): **Bước 1 (Đầu vào 100 điểm)** $\to$ **Bước 2 (Encoder 4 khối Conv1D & Embedding 128D)** $\to$ **Bước 3 (Decoder & đối chứng MSE)** $\to$ **Bước 4 (Classifier 12 lớp & lọc FAA)** $\to$ **Bước 5 (Điểm kết hợp theo thời gian & Công thức số thực tế)**.
+3. **Tab 3 — `3. Thử nghiệm dự đoán` (Live Inference):**
+   * Ghép 1 điểm dữ liệu mới nhập tay (`1` hoặc `D` đặc trưng) vào sau 99 điểm ngữ cảnh trước đó, điều chỉnh ngưỡng quyết định (mặc định phân vị `P99.5`) và chạy mô hình `ConvAEC` thời gian thực.
+   * Xuất ngay kết luận **`TRẠNG THÁI BÌNH THƯỜNG`** / **`PHÁT HIỆN BẤT THƯỜNG`**, nhóm bất thường giả tương đồng nhất, 4 thẻ điểm thô (`MSE`, `CE`, `Điểm kết hợp thô`, `Ngưỡng P99.5`), bảng các lớp bị loại bởi FAA, đồ thị tái tạo cửa sổ 100 điểm và nút **`🔍 Xem giải thích mô hình cho điểm này (Tab 2)`**.
 
-👉 **Để xem kịch bản bấm máy từng bước, lời dẫn và từng con số thực tế dùng khi đứng thuyết trình trước hội đồng**, hãy mở tệp: **[`RedLamp_Demo_Presentation.md`](./RedLamp_Demo_Presentation.md)**.
+👉 **Để xem kịch bản bấm máy từng bước, lời dẫn và từng con số thực tế dùng cho buổi thuyết trình cuối môn học**, hãy mở tệp: **[`RedLamp_Demo_Presentation.md`](./RedLamp_Demo_Presentation.md)** (kèm giải thích tính tay chi tiết tại **[`RedLamp_ConvAEC_StepByStep.md`](./RedLamp_ConvAEC_StepByStep.md)**).
