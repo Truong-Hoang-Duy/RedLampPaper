@@ -3,7 +3,7 @@
 **Tên bài báo gốc:** *Robust and Explainable Detector of Time Series Anomaly via Augmenting Multiclass Pseudo-Anomalies (REDLAMP)*  
 **Tác giả bài báo gốc:** Kohei Obata, Yasuko Matsubara, Yasushi Sakurai (Đại học Osaka, Nhật Bản) — **Hội nghị KDD '25** ([`2505.20765v1.pdf`](./2505.20765v1.pdf))  
 **Báo cáo tái lập thực nghiệm (CS2207):** [`Khai_thác_dữ_liệu_và_ứng_dụng___CS2207_26_1_CH_02.pdf`](./Khai_thác_dữ_liệu_và_ứng_dụng___CS2207_26_1_CH_02.pdf)  
-**Kịch bản thuyết trình Live Demo chi tiết (từng thao tác & số liệu):** Xem tại [`RedLamp_Demo_Presentation.md`](./RedLamp_Demo_Presentation.md)
+**Lời dẫn thuyết trình liên hoàn:** [`RedLamp_Demo_Script.md`](./RedLamp_Demo_Script.md) | **Cẩm nang khái niệm & số liệu giao diện:** [`RedLamp_Demo_Concepts.md`](./RedLamp_Demo_Concepts.md)
 
 > **🎯 Mục tiêu của tài liệu tổng hợp này:**  
 > Tài liệu này hợp nhất toàn bộ nội dung hướng dẫn lý thuyết nền tảng dành cho người mới bắt đầu Machine Learning, giải nghĩa mọi **từ viết tắt**, **ký hiệu toán học**, **kiến trúc `1D-CNN` / `ConvAEC`**, **12 lớp bất thường giả** và **công thức toán học từ (1) đến (8)** bằng các **ví dụ con số nhẩm tính được ngay trong 10 giây**, đồng thời tổng quan cấu trúc 3 Tab của ứng dụng Web Demo.
@@ -258,11 +258,11 @@ Khi khởi chạy [`../run_demo.bat`](../run_demo.bat) (mở `http://127.0.0.1:8
 
 1. **Tab 1 — `1. Tổng quan`:**
    * Chọn 1 trong 5 bộ dữ liệu (`SMD`, `AIOps / IOPS`, `MSL`, `SMAP`, `UCR`), chọn `Entity` (bao gồm cả `ALL` trung bình toàn tập) và `Seed (0 - 4)`.
-   * Xem bảng **Thông số cấu hình mô hình** (`ConvAEC`, `n_features`, `W = 100`, `Embedding = 128`), bảng **3 chỉ số đánh giá thực tế (`VUS-ROC`, `VUS-PR`, `RF` kèm `mean ± std` của 5 seeds)** và **Biểu đồ tổng quan toàn chuỗi thời gian** (hỗ trợ chọn từng đặc trưng `D1..Dn`).
+   * Xem bảng **Thông số cấu hình mô hình** (`ConvAEC (Autoencoder + Classifier)`, `D × W`, `Step Train/Test`, `Latent z=128 · Classifier=32`, cùng bộ siêu tham số cốt lõi Table 4: `BC α=0.10, β=0.01`, `Loss 0.9·MSE(Mask) + 0.1·CE`, `FAA δ=0.05 · MA=50`), bảng **3 chỉ số đánh giá thực tế (`VUS-ROC`, `VUS-PR`, `RF` kèm `mean ± std` của 5 seeds)** và **Biểu đồ tổng quan toàn chuỗi thời gian** (hỗ trợ chọn từng đặc trưng `D1..Dn`).
 2. **Tab 2 — `2. Giải thích mô hình` (Walkthrough 5 Bước XAI):**
    * Trình chiếu trực quan từng bước bên trong mạng (hỗ trợ phím mũi tên `←` / `→`): **Bước 1 (Đầu vào 100 điểm)** $\to$ **Bước 2 (Encoder 4 khối Conv1D & Embedding 128D)** $\to$ **Bước 3 (Decoder & đối chứng MSE)** $\to$ **Bước 4 (Classifier 12 lớp & lọc FAA)** $\to$ **Bước 5 (Điểm kết hợp theo thời gian & Công thức số thực tế)**.
 3. **Tab 3 — `3. Thử nghiệm dự đoán` (Live Inference):**
    * Ghép 1 điểm dữ liệu mới nhập tay (`1` hoặc `D` đặc trưng) vào sau 99 điểm ngữ cảnh trước đó, điều chỉnh ngưỡng quyết định (mặc định phân vị `P99.5`) và chạy mô hình `ConvAEC` thời gian thực.
    * Xuất ngay kết luận **`TRẠNG THÁI BÌNH THƯỜNG`** / **`PHÁT HIỆN BẤT THƯỜNG`**, nhóm bất thường giả tương đồng nhất, 4 thẻ điểm thô (`MSE`, `CE`, `Điểm kết hợp thô`, `Ngưỡng P99.5`), bảng các lớp bị loại bởi FAA, đồ thị tái tạo cửa sổ 100 điểm và nút **`🔍 Xem giải thích mô hình cho điểm này (Tab 2)`**.
 
-👉 **Để xem kịch bản bấm máy từng bước, lời dẫn và từng con số thực tế dùng cho buổi thuyết trình cuối môn học**, hãy mở tệp: **[`RedLamp_Demo_Presentation.md`](./RedLamp_Demo_Presentation.md)** (kèm giải thích tính tay chi tiết tại **[`RedLamp_ConvAEC_StepByStep.md`](./RedLamp_ConvAEC_StepByStep.md)**).
+👉 **Để đọc liền mạch lời dẫn thuyết trình trên sân khấu**, hãy mở **[`RedLamp_Demo_Script.md`](./RedLamp_Demo_Script.md)**; tra cứu chi tiết từng nhãn giao diện tại **[`RedLamp_Demo_Concepts.md`](./RedLamp_Demo_Concepts.md)** và ví dụ tính tay tại **[`RedLamp_ConvAEC_StepByStep.md`](./RedLamp_ConvAEC_StepByStep.md)**.
