@@ -4,6 +4,145 @@ Tài liệu này diễn giải chi tiết **từng phép nhân – cộng – bi
 
 ---
 
+## 0. Bức Tranh Tổng Quan — Nhìn Hình Hiểu Ngay `ConvAEC` & Vị Trí Của `Anomaly Mask`
+
+Trước khi đi vào từng phép nhân chi tiết, hãy nhìn **2 sơ đồ tổng quan** dưới đây (minh họa rút gọn cửa sổ thành **4 giây** trên 1 cảm biến để dễ theo dõi bằng mắt thường; thực tế trên `SMD` là **`100 giây × 38 cảm biến`**).
+
+### 0.1. Luồng Huấn Luyện (`TRAIN`) — Đầy đủ phép tính từ Đầu vào ──► `Encoder` ──► `Decoder (Mask)` & `Classifier`
+
+```text
+╔══════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║ [CHẶNG 0] CHUẨN BỊ DỮ LIỆU TỰ GIÁM SÁT (Trước khi vào mạng — thực hiện trong loader_aug.py)              ║
+║                                                                                                          ║
+║   Cửa sổ gốc sạch Z [100×38]:  ví dụ 4 giây kênh D1 = [0.20,  0.20,  0.20,  0.20]                        ║
+║         │                                                                                                ║
+║         ├──► (1) Bơm gai lỗi Spike (+0.80) vào giây thứ 3:                                               ║
+║         │        Đầu vào X [100×38]      = [0.20,  0.20,  1.00,  0.20]  ──► Đưa thẳng vào ENCODER        ║
+║         │                                                                                                ║
+║         ├──► (2) Ghi sổ tờ mặt nạ đánh dấu chỗ vừa bơm lỗi (1 = giữ nguyên, 0 = chỗ vừa bơm lỗi):        ║
+║         │        anomaly_mask [100×38]   = [  1 ,    1 ,    0 ,    1 ]  ──► Cất riêng, ĐỢI cuối DECODER! ║
+║         │                                                                                                ║
+║         └──► (3) Nhãn One-Hot y = [0, 1, 0..0] ──► Làm mềm Backward Correction (α=0.10, β=0.01):         ║
+║                  y_tilde [12 lớp]        = [0.11 (Normal), 0.79 (Spike), 0.01, ..., 0.01]                ║
+╚════════════════════════════════════════════════════╤═════════════════════════════════════════════════════╝
+                                                     │
+                                                     ▼  Đưa trọn vẹn X = [0.20, 0.20, 1.00, 0.20] vào mạng
+┌──────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ [CHẶNG 1] THÂN CHUNG: CONV-ENCODER (models/cnn.py -> ConvEncoder) — Nén cửa sổ [100×38] về [128×1]       │
+│                                                                                                          │
+│  1) Đảo trục để trượt theo thời gian: [100 bước × 38 kênh] ──► [38 kênh × 100 bước]                      │
+│                                                                                                          │
+│  2) Đi qua 4 khối ConvBlock 1D nối tiếp (kernel k=4, stride s=2, pad p=2 => T_mới = ⌊T_cũ/2⌋ + 1):       │
+│     Kích thước: [38×100] ──► Khối 0:[128×51] ──► Khối 1:[128×26] ──► Khối 2:[256×14] ──► Khối 3:[256×8]  │
+│                                                                                                          │
+│     * Phép tính cụ thể bên trong 1 khối (ví dụ Bộ lọc #1 dò gai [-1, -1, +3, -1] trượt trên X):          │
+│       (a) Conv1d (Nhân-cộng cửa sổ 4 bước, nhảy s=2 bước/lần):                                           │
+│           • Đoạn phẳng [0.20, 0.20, 0.20, 0.20]: 0.2(-1) + 0.2(-1) + 0.2(+3) + 0.2(-1) =  0.00           │
+│           • Trúng gai  [0.20, 0.20, 1.00, 0.20]: 0.2(-1) + 0.2(-1) + 1.0(+3) + 0.2(-1) = +2.40 (bắt gai!)│
+│           ──► Dãy tích chập thô:               [+0.40, -0.80, +2.40,  0.00,  0.00, ...]                  │
+│       (b) BatchNorm1d — Chuẩn hóa (x - μ)/σ về trung bình 0, phương sai 1:                               │
+│           ──► Sau chuẩn hóa biên độ:           [ 0.00, -1.20, +2.00, -0.40, -0.40, ...]                  │
+│       (c) ReLU — Hàm max(0, x) giữ số dương, cắt toàn bộ số âm về 0:                                     │
+│           ──► Chỉ còn điểm gai dương nổi bật:  [ 0.00,  0.00, +2.00,  0.00,  0.00, ...]                  │
+│       (d) Dropout(0.2) (chỉ bật lúc Train) — Tắt ngẫu nhiên 20% về 0, số còn lại nhân bù ×1.25:          │
+│           ──► Đầu ra khối tích chập:           [ 0.00,  0.00, +2.50,  0.00,  0.00, ...]                  │
+│                                                                                                          │
+│  3) Global MaxPool1d (kernel=8): Quét hết 8 mốc thời gian còn lại trên từng kênh, lấy 1 số lớn nhất:     │
+│     • Kênh #1: max([0.00, +2.50, 0.10, 0.00, 0.05, 0.00, 0.00, 0.00]) = +2.50                            │
+│     • Làm trên cả 256 kênh: [256 × 8] ──► [256 × 1]  (trục thời gian nén gọn về đúng 1!)                 │
+│                                                                                                          │
+│  4) Conv1x1 (256 ──► 128, KHÔNG có ReLU): Nhân ma trận trọng số [128×256] với cột [256×1]                │
+│     • Ví dụ: z_0 = w_{0,0}·(+2.50) + ... + b_0 = -0.85 ;  z_1 = +2.41 ; ...                              │
+│     • Kết quả: [256 × 1] ──► [128 × 1] (mang cả dấu Âm và Dương vì tầng cuối không cắt ReLU)             │
+└────────────────────────────────────────────────────┬─────────────────────────────────────────────────────┘
+                                                     │
+                                                     ▼
+                      ╔══════════════════════════════════════════════════════════════╗
+                      ║ [CHẶNG 2] NÚT CỔ CHAI: EMBEDDING z [128 × 1]                 ║
+                      ║   z = [-0.85, +2.41, -0.12, ..., +5.10]  (128 số thực)       ║
+                      ║   [!] KHÔNG HỀ CÓ MASK Ở ĐÂY!                                ║
+                      ║   Giữ nguyên 100% cả 128 số thực để chia cho 2 nhánh chữ Y!  ║
+                      ╚══════════════╤════════════════════════════════╤══════════════╝
+                                     │                                │
+             ┌───────────────────────┘                                └───────────────────────┐
+             ▼ (Nhánh 1: Khôi phục sóng chuẩn)                                                ▼ (Nhánh 2: Chẩn đoán 12 lớp)
+┌─────────────────────────────────────────────────────┐          ┌─────────────────────────────────────────────────────┐
+│ [CHẶNG 3A] CONV-DECODER (Giải nén ngược về 100×38)  │          │ [CHẶNG 3B] CLASSIFIER (MLP 2 tầng phân loại)        │
+│  1) Linear(1→8): kéo dãn [128×1] ──► [128×8]        │          │  1) Linear(128→32) ──► BatchNorm1d ──► ReLU         │
+│  2) 4 khối ConvTranspose1d (nhân ngược + BN + ReLU):│          │     ──► Dropout(0.2) ──► Linear(32→12) (12 điểm thô)│
+│     [128×8]→[256×14]→[256×26]→[128×51]→[128×100]    │          │  2) Softmax: p_i = e^(u_i) / ∑ e^(u_j) (tổng = 1.0) │
+│  3) Conv1x1(128→38) + đảo trục ──► X_hat [100×38]   │          │     ──► Ra xác suất y_hat [12 lớp]                  │
+└──────────────────────────┬──────────────────────────┘          └──────────────────────────┬──────────────────────────┘
+                           │                                                                │
+                           ▼ Vẽ lại đường êm chuẩn (bỏ qua gai):                            ▼ Đoán trúng hình dạng lỗi:
+              X_hat = [0.21, 0.20, 0.22, 0.20]                                 y_hat = [0.10 Normal, 0.80 Spike, ...]
+                           │                                                                │
+                           ▼                                                                ▼
+╔═════════════════════════════════════════════════════╗          ╔═════════════════════════════════════════════════════╗
+║ [CHẶNG 4A] CHỐT CHẶN ANOMALY MASK (Tính Loss L_MSE) ║          ║ [CHẶNG 4B] ĐỐI CHIẾU NHÃN MỀM (Tính Loss L_CE)      ║
+║ Lấy tờ anomaly_mask = [1, 1, 0, 1] nhân vào CẢ HAI: ║          ║ So khớp y_hat với nhãn mềm y_tilde [0.11, 0.79,...]:║
+║  • X     * mask: [0.20, 0.20, 1.00, 0.20]*[1,1,0,1] ║          ║  L_CE = -∑ y_tilde_i · ln(y_hat_i)                  ║
+║                = [0.20, 0.20,  0  , 0.20]           ║          ║       = -(0.11·ln 0.10 + 0.79·ln 0.80 + ...) ≈ 1.65 ║
+║  • X_hat * mask: [0.21, 0.20, 0.22, 0.20]*[1,1,0,1] ║          ╚══════════════════════════╤══════════════════════════╝
+║                = [0.21, 0.20,  0  , 0.20]           ║                                     │
+║  • Giây 1: (0.20 - 0.21)² = 0.0001 (chấm ô chuẩn)   ║                                     │
+║  • Giây 3: (  0  -   0  )² = 0     (KHÔNG PHẠT!)    ║                                     │
+║  ──► L_MSE trung bình cực nhỏ ≈ 0.0002              ║                                     │
+╚══════════════════════════╤══════════════════════════╝                                     │
+                           └──────────────────────────┐          ┌──────────────────────────┘
+                                                      ▼          ▼
+                                    [CHẶNG 5] TỔNG HỢP LOSS & CẬP NHẬT TRỌNG SỐ
+                                    L = 0.9·L_MSE + 0.1·L_CE = 0.9(0.0002) + 0.1(1.65) = 0.16518
+                                    ──► Lan truyền ngược (AdamW) tinh chỉnh bộ lọc cho bước kế tiếp!
+```
+
+---
+
+### 0.2. Luồng Kiểm Thử & Dự Đoán Thực Tế (`TEST / LIVE DEMO`) — Tắt `Dropout` & Tháo bỏ `Mask` để bắt lỗi!
+
+Khi mang mô hình đã nạp `bestmodel.pkl` ra chạy thực tế (hoặc bấm trên **Web Demo**), dữ liệu đi vào là cảm biến thật **chưa biết chỗ nào có lỗi**, nên **KHÔNG bơm lỗi giả**, **TẮT `Dropout` trong Encoder/Decoder/Classifier**, và **KHÔNG che `Anomaly Mask`** (mở `Mask = 1` toàn bộ `100×38` ô):
+
+```text
+Tín hiệu thực tế X = [0.20, 0.20, 1.00 (Sự cố thật!), 0.20]
+                              │
+                              ▼
+         ┌─────────────────────────────────────────┐
+         │ ENCODER (chế độ eval: TẮT Dropout)      │
+         │ 4 ConvBlock (100→51→26→14→8)            │
+         │ ──► MaxPool1d(8→1) ──► Conv1x1(256→128) │
+         └────────────────────┬────────────────────┘
+                              │
+                              ▼  Embedding z [128 số thực] (lệch mạnh khỏi vùng chuẩn 0)
+              ┌───────────────┴───────────────────────────────┐
+              ▼                                               ▼
+   DECODER (1→8→14→26→51→100)                      CLASSIFIER (128→32→12 + Softmax)
+   (Do lúc Train được Mask bảo vệ                  (Nhận diện hình thái sóng đang
+    nên chỉ biết vẽ lại sóng chuẩn!)                giống lớp lỗi giả nào nhất)
+              │                                               │
+              ▼                                               ▼
+   X_hat = [0.21, 0.20, 0.22, 0.20]                Dự đoán: 99% thuộc lớp "Spike"
+              │                                    + Lọc FAA: gạch về 0 các lớp > 5% chuỗi
+              ▼                                               │
+   KHÔNG CHE MASK (tính đủ 100% các ô):                       ▼
+   Tại giây 3: (1.00 - 0.22)² = 0.6084!            Điểm phân loại s_CE = ∑ p_lỗi_hợp_lệ ≈ 0.99
+   ──► Điểm tái tạo s_MSE VỌT GẤP 6000×!                      │
+              │                                               │
+              └───────────────┬───────────────────────────────┘
+                              ▼
+             ĐIỂM BẤT THƯỜNG KẾT HỢP (Combined Score)
+             • Cửa sổ đơn (Tab 2 & Tab 3 Demo): Raw Combined = (s_MSE + s_CE) / 2  so với  μ + 3σ
+             • Toàn chuỗi (Tab 1 & Chấm điểm):  s(t) = 0.5·MinMax(MA_50(s_MSE)) + 0.5·MinMax(MA_50(s_CE))
+             ──► VƯỢT NGƯỠNG ──► BÁO ĐỘNG BẤT THƯỜNG!
+```
+
+> [!IMPORTANT]
+> **3 điểm cốt lõi cần nhớ để không bao giờ nhầm về `Anomaly Mask`:**
+> 1. **Mask che ở đâu?** Mask **KHÔNG** che ở `Encoder` và **KHÔNG** biến đổi `128` đặc trưng ẩn `z` thành `0/1`. Vector `z` (`[128 × 1]`) luôn là `128` số thực giữ nguyên vẹn. Mask có kích thước bằng đúng cửa sổ thời gian (`[100 × 38]`) và **chỉ nhân ở bước cuối cùng sau `Decoder`** khi tính `L_MSE`.
+> 2. **Ai tạo ra số `0` và `1` trong Mask?** Không phải mạng AI tự suy ra. Lúc `Train`, chính đoạn code tạo dữ liệu giả (`loader_aug.py`) tự chọn vị trí để chèn lỗi nên nó biết sẵn ô nào vừa bị sửa để ghi số `0` (che đi), ô nào giữ nguyên để ghi số `1` (giữ lại).
+> 3. **Tại sao trên Web Demo (Tab 2 – Bước 3 Decoder) lại có khái niệm Bật/Tắt Mask?** Mặc định lúc chạy `Test` là **Tắt Mask** (mở `1` toàn bộ `3,800` ô) để lộ vùng sai lệch đỏ `|X - X_hat|` giúp bắt lỗi; còn khi **Bật Mask** trên Demo là để **mô phỏng lại góc nhìn lúc `Train`** — cho người xem thấy nếu che các ô vượt chuẩn bằng `0` thì `MSE` lập tức sụt về gần `0`, giải thích vì sao `Decoder` không học vẹt gai nhiễu.
+
+---
+
 ## 1. Phân Cấp Dữ Liệu & Giải Trừ Các Hiểu Nhầm Dễ Gặp
 
 ### 1.1. Phân biệt rõ: `Dataset` vs. `Entity (Machine)` vs. `Channel (Kênh)`
@@ -27,6 +166,7 @@ Trên bộ dữ liệu máy chủ **`SMD`**, ba khái niệm này nằm ở các
 | *"`ReLU` làm nhiệm vụ gì?"* | Công thức $\text{ReLU}(x) = \max(0, x)$: **số dương giữ nguyên, số âm biến thành `0`**. Giúp loại bỏ tín hiệu âm không khớp bộ lọc và tạo **tính phi tuyến** để mạng học được quy luật sóng phức tạp. |
 | *"`Dropout = 0.2` cắt ngắn mảng đi 20%"* | Mảng **giữ nguyên kích thước**, nhưng ngẫu nhiên **tắt 20% vị trí về `0`** (và nhân bù các số còn lại lên `1 / 0.8 = 1.25`). **Chỉ bật lúc `Train`** để chống **`Overfitting`**, **tắt hoàn toàn lúc `Test / Demo`**. |
 | *"`Conv1x1` ở cuối Encoder trả thẳng về 12 lớp"* | **Chưa phân loại.** `Conv1x1` chỉ gom `256` kênh xuống **`Bottleneck` `128` chiều (`Embedding`)**. Từ `128` số này mạng mới **rẽ làm 2 nhánh chữ Y**: `Decoder` (`Reconstruction`) và `Classifier` (12 lớp). |
+| *"`Anomaly Mask` che hoặc biến `128` đặc trưng ẩn `z` sau `Encoder` thành `[0, 0, 0, 1]`"* | **Không phải.** `128` số của `Embedding z` là **số thực âm/dương giữ nguyên 100%** để cấp cho cả `Decoder` lẫn `Classifier`. `Anomaly Mask` có kích thước bằng cửa sổ gốc **`[100 × 38]`** (sinh sẵn lúc chèn lỗi giả: `1` = ô chuẩn, `0` = ô chèn lỗi) và **chỉ nhân ở cuối cùng sau `Decoder`** khi tính `L_MSE` lúc `Train`. |
 | *"`Bước trượt 10 (Train) · 1 (Test)` giống `stride = 2` của CNN"* | **Khác hẳn cấp độ.** `Bước trượt 10 / 1` là khoảng cách kéo khung lớn `W = 100` trên chuỗi dữ liệu dài để **cắt mẫu cửa sổ** (Train nhảy `10` bước `[0..99] → [10..109]` để giảm trùng lặp 99% và nhanh gấp 10×; Test nhích từng `1` bước `[0..99] → [1..100]` để chấm mọi giây). Còn `stride = 2` là bước nhảy của bộ lọc nhỏ `k = 4` **bên trong** 1 cửa sổ 100 điểm. |
 
 ---
@@ -37,25 +177,27 @@ Sơ đồ dưới đây mô tả chính xác luồng biến đổi kích thướ
 
 ```mermaid
 flowchart LR
-    subgraph PREP["Chuẩn bị đầu vào — Bên trái Figure 2(b)"]
-        A["Bước 1: Cửa sổ gốc Z<br/>[100 × 38]"] --> B["Bước 2: Chèn lỗi giả<br/>Augmented instance X [100 × 38]<br/>+ Mask W [100 × 38]<br/>+ One-hot label y [12]"]
+    subgraph PREP["Chuẩn bị đầu vào (Bên trái Figure 2b)"]
+        A["Bước 1: Cửa sổ gốc Z [100 × 38]"] --> B["Bước 2: Bơm lỗi giả → X [100 × 38], Mask [100 × 38], Nhãn y [12]"]
     end
 
-    subgraph ENC["Hình thang cam Encoder — Giữa Figure 2(b)"]
-        C["Bước 3: 4 khối ConvBlock 1D<br/>100 → 51 → 26 → 14 → 8<br/>Ra: [256 × 8]"] --> D["Bước 4: MaxPool1d + Conv1x1<br/>[256 × 8] → [256 × 1] → [128 × 1]<br/>Thanh dọc Embedding (128 số)"]
+    subgraph ENC["Hình thang cam Encoder (Giữa Figure 2b)"]
+        C["Bước 3: 4 khối ConvBlock 1D (100→51→26→14→8) → [256 × 8]"] --> D["Bước 4: MaxPool1d + Conv1x1 → Embedding z [128 × 1] (Giữ nguyên 128 số thực)"]
     end
 
     subgraph DEC["Nhánh ngang: Hình thang xanh lá Decoder"]
-        E["Bước 5A: Linear(1→8) + 4 ConvTranspose1d<br/>Reconstruction X_hat [100 × 38]"] --> F["Nhân Anomaly Mask W<br/>Tính sai số tái tạo L_MSE"]
+        E["Bước 5A: Linear(1→8) + 4 ConvTranspose1d → X_hat [100 × 38]"] --> F["Nhân Anomaly Mask [100 × 38] vào X và X_hat → Tính L_MSE"]
     end
 
     subgraph CLS["Nhánh trên: Hình thang tím Classifier"]
-        G["Bước 5B: MLP 128 → 32 → 12 + Softmax<br/>Predicted label y_hat [12]"] --> H["So với Corrected label y_tilde<br/>(Backward correction)<br/>Tính sai số phân loại L_CE"]
+        G["Bước 5B: MLP 128 → 32 → 12 + Softmax → y_hat [12]"] --> H["So với nhãn mềm y_tilde (Backward Correction) → Tính L_CE"]
     end
 
-    B --> C
-    D --> E
-    D --> G
+    B -- "Đưa X [100 × 38]" --> C
+    D -- "Truyền nguyên z [128]" --> E
+    D -- "Truyền nguyên z [128]" --> G
+    B -. "Đưa thẳng anomaly_mask [100 × 38] (bỏ qua Encoder & Decoder)" .-> F
+    B -. "Đưa nhãn y [12] đi làm mềm" .-> H
 ```
 
 | Bước tính toán | Vị trí trên **Figure 2(b)** (`2505.20765v1.pdf`, tr. 4) | Vai trò cốt lõi |
