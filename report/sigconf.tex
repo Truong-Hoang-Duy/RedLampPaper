@@ -1,0 +1,357 @@
+\documentclass[sigconf,nonacm]{acmart}
+
+%% 1. Disable ACM Reference Format
+\settopmatter{printacmref=false, printfolios=false}
+
+%% 2. Disable copyright footnote on page 1
+\renewcommand\footnotetextcopyrightpermission[1]{}
+
+%% 3. Disable Running Headers and Footers on all pages
+\pagestyle{empty}
+
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage{array}
+\usepackage{capt-of}
+
+%% Consistent compact list styling for two-column ACM layout
+\setlist[itemize]{leftmargin=1.4em, itemsep=1.5pt, topsep=2pt, parsep=0pt}
+\setlist[enumerate]{leftmargin=1.5em, itemsep=1.5pt, topsep=2pt, parsep=0pt}
+
+%% Refined vertical spacing around displayed equations
+\setlength{\abovedisplayskip}{4pt plus 1pt minus 1pt}
+\setlength{\belowdisplayskip}{4pt plus 1pt minus 1pt}
+\setlength{\abovedisplayshortskip}{2pt}
+\setlength{\belowdisplayshortskip}{2pt}
+
+\begin{document}
+
+\title{Time Series Anomaly Detection using Augmenting Multiclass Pseudo-Anomalies and RedLamp}
+
+\author{Vo Nguyen Le Duy}
+\authornote{Lecturer}
+\affiliation{%
+  \institution{University of Information Technology, Vietnam National University}
+  \city{Ho Chi Minh City}
+  \country{Vietnam}
+}
+\email{duyvnl@uit.edu.vn}
+
+\author{Nguyen Dinh Quoc Bao}
+\affiliation{%
+  \institution{University of Information Technology, Vietnam National University}
+  \city{Ho Chi Minh City}
+  \country{Vietnam}
+}
+\email{26848009@grad.uit.edu.vn}
+
+\author{Ngo Phuc Danh}
+\affiliation{%
+  \institution{University of Information Technology, Vietnam National University}
+  \city{Ho Chi Minh City}
+  \country{Vietnam}
+}
+\email{26848029@grad.uit.edu.vn}
+
+\author{Truong Hoang Duy}
+\affiliation{%
+  \institution{University of Information Technology, Vietnam National University}
+  \city{Ho Chi Minh City}
+  \country{Vietnam}
+}
+\email{26848055@grad.uit.edu.vn}
+
+\author{Nguyen Thi Quynh Anh}
+\affiliation{%
+  \institution{University of Information Technology, Vietnam National University}
+  \city{Ho Chi Minh City}
+  \country{Vietnam}
+}
+\email{250104031@grad.uit.edu.vn}
+
+\author{Nguyen Ngoc Cuong}
+\affiliation{%
+  \institution{University of Information Technology, Vietnam National University}
+  \city{Ho Chi Minh City}
+  \country{Vietnam}
+}
+\email{250201046@grad.uit.edu.vn}
+
+\renewcommand{\shortauthors}{}
+
+\maketitle
+\pagestyle{empty}
+\thispagestyle{empty}
+
+\section{Introduction}
+Time Series Anomaly Detection (TSAD) is essential for monitoring industrial equipment, IoT sensors, and medical signals. Due to the scarcity of annotated anomalies, practical TSAD relies on unsupervised learning. While traditional deep methods relied on the \textit{normality assumption} (reconstruction error), recent self-supervised approaches adopt the \textit{binary anomaly assumption}, framing unsupervised TSAD as binary classification using synthetic anomalies.
+
+Despite recent progress, binary approaches suffer from three key vulnerabilities:
+\begin{enumerate}
+    \item \textbf{Diversity Gap:} Simple transformations fail to capture diverse temporal and spectral anomaly patterns, leaving major unexplored gaps in the latent representation space.
+    \item \textbf{False Anomalies:} Synthetic augmentations often yield normal-looking instances. Forcing hard binary labels ($y=1$) induces classifier overconfidence and false alarms.
+    \item \textbf{Anomaly Contamination:} Real-world training sets contain undetected anomalies, causing reconstructive models to overgeneralize and binary classifiers to mislabel true anomalies as normal.
+\end{enumerate}
+
+To evaluate solutions to these challenges, we re-implement \textbf{RedLamp}, a novel TSAD model based on a \textit{multiclass anomaly assumption}. RedLamp formulates 11 distinct pseudo-anomaly classes (e.g., \textit{Spike, Speedup, Flip, Noise, Cutoff, Scale, Wander, Contextual, Upsidedown, Average, Mixture}). Training a shared CNN encoder and MLP classifier across these classes establishes an explainable multi-cluster latent space.
+
+RedLamp incorporates two key robust mechanisms:
+\begin{itemize}
+    \item \textbf{Backward Correction:} Models label noise transition probabilities to convert rigid one-hot labels into calibrated \textit{soft labels}, neutralizing false anomalies and contamination noise.
+    \item \textbf{Masked Reconstruction Loss:} Restricts reconstruction loss to unperturbed regions, preventing the decoder from memorizing synthetic artifacts.
+\end{itemize}
+
+\subsection*{Contributions of This Study}
+\begin{itemize}
+    \item \textbf{Framework Re-implementation:} We construct a complete, modular code baseline of RedLamp, including the 11 augmentation functions, encoder-decoder, and backward label correction.
+    \item \textbf{Empirical Verification:} We independently evaluate RedLamp on benchmark datasets, confirming substantial VUS-PR performance improvements over traditional binary baselines.
+\end{itemize}
+
+\section{Problem Statement}
+We focus on unsupervised Time Series Anomaly Detection (TSAD) using a local contextual window to model temporal dependencies. Let $\mathbf{X} = \{\mathbf{x}_1, \mathbf{x}_2, \dots, \mathbf{x}_T\} \in \mathbb{R}^{D \times T}$ be a multivariate series of $D$ features over $T$ timesteps ($D=1$ for univariate). A sliding window of length $L$ (stride $1$) segments $\mathbf{X}$ into an unlabeled training set $\mathcal{X}^{\text{train}} = \{\mathbf{X}^{(L)}, \mathbf{X}^{(L+1)}, \dots, \mathbf{X}^{(T)}\}$ and test set $\mathcal{X}^{\text{test}}$ of window size $L$, where $\mathbf{X}^{(t)}_{i,j}$ denotes feature $i$ at local step $j$:
+\begin{equation}
+    \mathbf{X}^{(t)} = \{\mathbf{x}_{t-L+1}, \dots, \mathbf{x}_t\} \in \mathbb{R}^{D \times L}, \;\; s(t) = \mathcal{F}_{\theta}(\mathbf{X}^{(t)}) \ge 0.
+\end{equation}
+Trained exclusively on unlabeled $\mathcal{X}^{\text{train}}$---where \textit{anomaly contamination} is inevitable---the detector $\mathcal{F}_{\theta}$ aims to assign higher scores $s(t)$ to anomalous instances $\mathbf{X}^{(t)} \in \mathcal{X}^{\text{test}}$ than to normal ones. Boundary learning spans three paradigms (Table~\ref{tab:assumptions}):
+\begin{itemize}
+    \item \textbf{Normality Assumption:} Presumes $\mathcal{X}^{\text{train}}$ is mostly normal; contaminated samples induce overgeneralization (high FNR), while subtle pattern-wise anomalies are missed.
+    \item \textbf{Binary Assumption:} Contrasts $\mathcal{X}^{\text{train}}$ with single-class augmentations, leaving an uncovered \textit{diversity gap}, benign \textit{false anomalies} (high FPR), and hard-label overconfidence.
+    \item \textbf{Multiclass Assumption (RedLamp):} Uses $K$ augmentations $\{f^{(1)}, \dots, f^{(K)}\}$ to build $(\mathbf{X}^{(t,k)}, \tilde{\mathbf{y}}^{(t,k)}, \mathbf{W}^{(t,k)})$, uniting masked reconstruction, soft labels, and \textit{pseudo-normal} filtering.
+\end{itemize}
+\par\vspace{4pt plus 8pt minus 3pt}\noindent
+\begin{minipage}[b]{\columnwidth}
+\setlength{\abovecaptionskip}{0pt}%
+\setlength{\belowcaptionskip}{5pt}%
+\captionof{table}{Comparison of TSAD learning assumptions.}%
+\label{tab:assumptions}%
+\footnotesize
+\setlength{\tabcolsep}{4.5pt}%
+\begin{tabularx}{\columnwidth}{@{}lXcccc@{}}
+\toprule
+\textbf{Assumption} & \textbf{Supervision} & \textbf{Div.} & \textbf{Contam.} & \textbf{False} & \textbf{Expl.} \\
+\midrule
+Normality           & Clean $\mathcal{X}^{\text{train}}$     & --           & --           & --           & --           \\
+Binary              & Hard $y \in \{0, 1\}$                  & $\circ$      & $\circ$      & --           & --           \\
+\textbf{Multiclass} & Soft $\tilde{\mathbf{y}} \in [0, 1]^K$ & $\checkmark$ & $\checkmark$ & $\checkmark$ & $\checkmark$ \\
+\bottomrule
+\multicolumn{6}{@{}l@{}}{\scriptsize $\circ$: partial (e.g., CutAddPaste, COUTA); $\checkmark$: addressed by RedLamp.}
+\end{tabularx}
+\end{minipage}\par
+
+\section{Methodology}
+\subsection{Framework Architecture and Layer Setup (ConvAEC)}
+RedLamp processes sliding windows $X \in \mathbb{R}^{B \times W \times D}$ ($W=100$ timestamps, $D$ features) without recurrent bottlenecks via a 1D Convolutional Autoencoder with an auxiliary Classifier head (\textbf{ConvAEC}):
+
+\paragraph{1D Convolutional Encoder:} Ingests window $X$ through 4 cascading \texttt{ConvBlock} stages with filter counts $[128, 128, 256, 256]$, kernel size $k=4$, stride $s=2$, and padding $p=2$. Each block executes $\texttt{Conv1d} \rightarrow \texttt{BatchNorm1d} \rightarrow \texttt{ReLU} \rightarrow \texttt{Dropout}(0.2)$. A temporal global max-pooling layer and a $1 \times 1$ pointwise convolution compress feature representations into a 128-dimensional latent vector $z \in \mathbb{R}^{B \times 128 \times 1}$.
+
+\paragraph{1D Transposed Convolutional Decoder:} Inverts latent $z$ back to sequence space. An upsampling linear layer maps $z$ to compressed temporal length, followed by 4 \texttt{ConvTransposeBlock} stages with channels $[256, 256, 128, 128]$, $k=4$, and $s=2$. Dynamic output padding restores exact sequence length $W=100$. A $1 \times 1$ convolution projects representations to reconstructed output $\hat{X} \in \mathbb{R}^{B \times W \times D}$.
+
+\paragraph{Auxiliary Non-Linear Classifier:} Branches directly from flattened latent vector $z \in \mathbb{R}^{B \times 128}$ via $\texttt{Linear}(128, 32) \rightarrow \texttt{BatchNorm1d} \rightarrow \texttt{ReLU} \rightarrow \texttt{Dropout}(0.2) \rightarrow \texttt{Linear}(32, 12) \rightarrow \texttt{Softmax}$, predicting probability distribution $\hat{y} \in \mathbb{R}^{B \times 12}$ (Table~\ref{tab:arch}).
+
+\paragraph{Joint Optimization Objective:} RedLamp minimizes:
+\begin{equation}
+    \mathcal{L}_{\text{total}} = (1 - \lambda)\mathcal{L}_{\text{rec}} + \lambda\mathcal{L}_{\text{cls}} \quad (\lambda = 0.1)
+\end{equation}
+A \textbf{binary anomaly mask} $M \in \{0, 1\}^{W \times D}$ ($M_{t,d}=0$ at perturbed points, $1$ elsewhere) forces $\mathcal{L}_{\text{rec}}$ to reconstruct exclusively normal contexts:
+\begin{equation}
+    \mathcal{L}_{\text{rec}} = \frac{1}{\|M\|_1} \| (\hat{X} - X) \odot M \|_2^2, \quad \mathcal{L}_{\text{cls}} = -\sum_{c=1}^{12} \tilde{y}_c \log(\hat{y}_c)
+\end{equation}
+
+\par\vspace{11pt plus 3pt minus 2pt}\noindent
+\begin{minipage}[b]{\columnwidth}
+\setlength{\abovecaptionskip}{0pt}%
+\setlength{\belowcaptionskip}{8pt}%
+\captionof{table}{ConvAEC Layer Specifications ($W=100$)}%
+\label{tab:arch}%
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}%
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}llcc@{}}
+\toprule
+\textbf{Submodule} & \textbf{Layer Operations} & \textbf{Kernel / Stride} & \textbf{Output Shape} \\
+\midrule
+Input       & Window Slicer             & $W=100, \text{step}=1$            & $(B, 100, D)$ \\
+Encoder     & 4x Conv1d + BN + ReLU     & $[128, 128, 256, 256], k=4, s=2$  & $(B, 256, L_c)$ \\
+Bottleneck  & Global MaxPool + Conv1x1  & $k=L_c, \text{emb}=128$           & $(B, 128, 1)$ \\
+Decoder     & 4x ConvTranspose1d + BN   & $[256, 256, 128, 128], k=4, s=2$  & $(B, 128, 100)$ \\
+Output Head & Conv1d ($1\times 1$)        & in=$128$, out=$D$                 & $(B, 100, D)$ \\
+Classifier  & 2-Layer MLP + Softmax     & Linear(128, 32) $\rightarrow$ Linear(32, 12) & $(B, 12)$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{minipage}\par\vspace{8pt plus 3pt minus 2pt}
+
+\subsection{Anomaly Data Augmentation and Label Republishment}
+To enable self-supervised discrimination without manual labels, RedLamp injects 11 artificial anomaly patterns into clean reference windows, forming a 12-class taxonomy ($C=12$):
+\begin{itemize}
+    \item \textbf{Normal (Class 0):} Clean unperturbed baseline with identity mask $M = \mathbf{1}$.
+    \item \textbf{Point Perturbations:} \textit{Spike} (impulse spikes), \textit{Noise} (Gaussian noise $\mathcal{N}(0, \sigma^2)$), and \textit{Cutoff} (value clipping at saturation limits).
+    \item \textbf{Structural Perturbations:} \textit{Flip} ($t \mapsto -t$), \textit{Speedup} (temporal frequency warping), \textit{Average} (moving-average smoothing), \textit{Scale} (multiplicative scaling), \textit{Wander} (stochastic trend drift), \textit{Contextual} (distant subsequence swap), \textit{UpsideDown} ($x \mapsto -x$), and \textit{Mixture} (composite multi-anomaly injection).
+\end{itemize}
+
+\paragraph{Label Republishment (Asymmetric Smoothing):} Hard one-hot targets cause the classifier to overfit artificial artifacts. RedLamp applies asymmetric label smoothing with a structural normal prior:
+\begin{equation}
+    \tilde{y} = y \cdot (1 - \alpha - \beta C + \beta) + (1 - y) \cdot \beta, \quad \tilde{y}_{\text{normal}} \leftarrow \tilde{y}_{\text{normal}} + \alpha
+\end{equation}
+where $\alpha = 0.1$ reinforces nominal stability, and $\beta = 0.01$ disperses uncertainty across all anomaly categories ($C=12$).
+
+\subsection{Two-Stage Composite Anomaly Scoring}
+At test time, the composite anomaly score fuses reconstruction discrepancy with synthetic outlier classifier confidence:
+\begin{equation}
+    \text{Score}(t) = \frac{1}{2}\left( \text{Score}_{\text{MSE}}(t) + \text{Score}_{\text{CE}}(t) \right)
+\end{equation}
+\begin{itemize}
+    \item $\text{Score}_{\text{MSE}}$: Pointwise reconstruction error $\frac{1}{D}\sum_d (X_{t,d} - \hat{X}_{t,d})^2$, smoothed by moving average filter ($w = W/2 = 50$) and Min-Max scaled.
+    \item $\text{Score}_{\text{CE}}$: Sum of predicted probabilities $\hat{y}_c$ strictly for non-background classes $c \notin \mathcal{I}_{\text{bg}}$, where $\mathcal{I}_{\text{bg}} = \{0\} \cup \{c \mid \bar{y}_c > 0.05\}$ excludes the normal class and sequence-wide frequent false positives (classes whose mean probability across the sequence exceeds 5\%). The sum is smoothed ($w=50$) and Min-Max normalized.
+\end{itemize}
+
+\section{Experiments}
+
+\subsection{Dataset}
+The paper evaluates five public datasets, two univariate (UCR, AIOps) and three multivariate (SMD, SMAP, MSL), whose statistics are given in Table~\ref{tab:dataset_stats}. The five datasets complement one another: UCR is the only one whose training set is known to be anomaly-free and is therefore suited to controlled contamination experiments, AIOps contains labelled anomalies in its training set (2.49\% on average), and SMD, SMAP and MSL are popular multivariate benchmarks without training labels.
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Statistics of the five datasets, averaged per sub-dataset.}
+\label{tab:dataset_stats}
+\setlength{\tabcolsep}{6pt}
+\begin{tabularx}{\textwidth}{@{}lXrrrrrr@{}}
+\toprule
+\textbf{Dataset} & \textbf{Domain} & \textbf{Sub-datasets} & \textbf{Dims} & \textbf{Train length} & \textbf{Test length} & \textbf{Test anomalies} & \textbf{Test anomaly \%} \\
+\midrule
+UCR   & Many domains (ECG, ABP, NASA\dots) & 250 & 1  & 30,522  & 56,173  & 1.00  & 0.85  \\
+AIOps & Web-service KPIs                   & 29  & 1  & 103,588 & 100,649 & 50.69 & 1.81  \\
+SMD   & Server machines, 5 weeks           & 28  & 38 & 25,300  & 25,300  & 11.68 & 4.21  \\
+SMAP  & NASA satellite                     & 50  & 25 & 2,752   & 8,203   & 1.28  & 11.14 \\
+MSL   & Mars rover                         & 23  & 55 & 2,410   & 2,923   & 1.26  & 13.01 \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+Our EDA shows that in UCR, excluding three files whose anomaly start equals its end, 192 of 247 series (77.7\%) have an anomaly segment lying entirely within the training value range, suggesting that most anomalies must be recognised by their shape or context rather than by their amplitude. In addition 184 series fall into 90 groups that share the same source and identical split and anomaly positions, and are likely distorted copies of one another. In the three excluded files, the authors' loader labels anomalies as $[\text{start}, \text{end})$, so these series contain no labelled anomalous point at evaluation. In AIOps, the training set is contaminated with real anomalies, exceeding 5\% in 9/29 KPIs, and 10 KPIs miss 13.6--17.7\% of their test timestamps in the original files. SMD anomalies are multivariate: each segment involves a median of 4 dimensions. SMAP and MSL have many command columns that are constant in training (on average 10.2/24 and 41.9/54 columns). At the same time, the true anomaly ratio of these two datasets (11--13\%) is higher than the 5\% FAA threshold. After preprocessing with the authors' repository, the statistics match the paper on four datasets, only UCR differs, with a mean training length of 21,210 instead of 30,522, and SMAP keeps 49 channels.
+
+\subsection{Protocol, Hyperparameters and Baselines}
+The paper uses the sliding-window approach common in deep time-series anomaly detection: each series is cut into windows of length $L = 100$, and each window is one sample, so that the model captures local temporal dependency. The training step is 10. For UCR, whose series contain many repeated patterns, the step is chosen from $\{1, 10, 100\}$ to keep fewer than 10,000 training samples. Data are min-max normalized, i.e.\ each dimension is mapped to $[0, 1]$ using the minimum and maximum of the training set. For SMAP and MSL, the authors aggregate all channels to train one shared model, whereas each sub-dataset of the other three datasets gets its own model. Results are averaged over five runs. The authors do not justify the aggregation, but a plausible reason is that each SMAP/MSL channel has on average only 2,752 (SMAP) and 2,410 (MSL) training points. The authors' code shows that aggregation applies only to training: one model is trained on all channels, but anomaly scores are saved separately for each channel.
+
+RedLamp is trained with AdamW at a learning rate of $10^{-3}$, batch size 128 and at most 100 epochs, with early stopping on 10\% of the training data held out for validation. Its method-specific hyperparameters are the number of classes $K = 12$ (one Normal class and 11 pseudo-anomaly classes), $\alpha = 0.1$ and $\beta = 0.01$ in the soft labels, $\gamma = 0.1$ as the weight of the cross-entropy term in the loss, and the FAA threshold $\delta = 0.05$. Here $\alpha$ is the probability that a pseudo-anomaly is actually normal (a false anomaly), and $\beta$ is the probability that one class is mistaken for another, including real anomalies in the training set that are labelled as normal. These values are supported by experiments: adding classes improves the model, and on SMD, setting $\alpha$, $\beta$ or $\gamma$ to zero or too high lowers VUS-PR; only $\delta$ has no sensitivity study. The authors use a single hyperparameter set for all datasets, arguing that earlier binary methods must tune their augmentations for each dataset. The authors' official code also contains three details that the paper does not mention, and our reproduction keeps them unchanged: a patience of 10, cross-entropy applied to an output that has already passed through softmax, and smoothing of RedLamp's score with a 50-step moving average.
+
+The twelve baselines fall into five groups: classical machine learning (IsolationForest, OCSVM), GAN/VAE/AE (BeatGAN, LSTM-VAE, USAD), Transformer (AT, TranAD), diffusion (IMDiffusion, D3R), and methods based on the binary assumption (NCAD, COUTA, CutAddPaste). This grouping ensures that both assumptions are represented: the normality assumption treats almost all training samples as normal, while the binary assumption treats augmented samples as anomalies. The baselines use their published hyperparameters, batch size 16, window 100 and the same validation split. Baselines that define their own scoring mechanism, such as AT, are scored by the reconstruction error instead, which the authors found better on all datasets and attribute to inappropriate metrics in the original papers. Baseline scores are likewise smoothed with a 50-step moving average.
+
+On our side, the reproduction runs the authors' code with its default configuration, so the model, preprocessing and all hyperparameters match the paper, including the double softmax, which we deliberately kept in order to reproduce the published numbers. The differences lie in three points. First, scope: because of limited computing time, we ran only AIOps, SMD, SMAP and MSL with five seeds, UCR with 1 seed and did not re-run the twelve baselines. SMAP has 49 channels because the channel list in the authors' code contains P-2 twice. Second, we reset the seed at the start of each entity so that an entity's result does not depend on the run order. SMAP and MSL consist of a single entity and are therefore unaffected. Third, the authors' code only saves anomaly scores and computes no metrics, so we had to write the evaluation ourselves, as described later.
+
+\subsection{Evaluation Metrics}
+The traditional evaluation in TSAD is F1 with point adjustment (PA): after a threshold is chosen, detecting a single point of an anomaly segment is enough for the whole segment to count as detected. For a more comprehensive evaluation, the paper uses five range-based metrics.
+
+The Range F-score evaluates segments rather than individual points: the recall of a segment combines whether the segment is touched at all with the fraction of it that is covered, with a penalty when the detection is fragmented into many pieces. Precision is computed analogously over the predicted segments. Range-AUC-ROC and Range-AUC-PR extend the label of each segment with a buffer on both sides whose weights decrease with distance, and then compute the area under the ROC or PR curve over all thresholds. As a result, these metrics do not depend on a threshold and tolerate small offsets between score peaks and label boundaries. The paper sets the buffer to half the window. VUS-ROC and VUS-PR go one step further and average Range-AUC over all buffer lengths, so this length does not have to be chosen. According to the benchmark of Liu and Paparrizos, VUS-PR is the most reliable and accurate metric, and the paper adopts it as its main metric. The preference for PR is also intuitive: with anomaly ratios of only 0.85--13\%, ROC, whose false positive rate is divided by the very large number of normal points, is less sensitive to false alarms than precision. For UCR, where each series has exactly one anomaly segment, the paper additionally uses Accuracy: a series counts as correct if its highest score falls inside the true anomaly segment.
+
+Two points in this part remain unclear. The paper calls all five metrics threshold-independent, yet the Range F-score actually requires a threshold, which the paper does not specify. Moreover, since the authors' code has no evaluation part, we wrote it ourselves on top of the TSB-AD library and had to make three choices: assigning each window's score to the window's centre step, using the $\text{mean} + 3\,\text{std}$ threshold for the Range F-score, and a window of 100 (buffer 50) for Range-AUC and VUS.
+
+\section{Result}
+\subsection{Comparison with Baselines}
+Table~\ref{tab:main} reports the published results. RedLamp achieves the best average on all three metrics (V-R 0.803, V-P 0.430, RF 0.219), improving on the second-best methods by 5.9\%, 17.4\% and 14.6\% (gap divided by RedLamp's score). The margin is largest on UCR, where pattern-wise anomalies dominate: V-P 0.492 versus 0.441 for CutAddPaste and only 0.205 for the best reconstruction model, BeatGAN. However, RedLamp is not best everywhere: BeatGAN wins on AIOps, AT on SMD, CutAddPaste on SMAP and D3R on MSL.
+
+\par\vspace{5pt plus 4pt minus 3pt}\noindent
+\begin{minipage}[b]{\columnwidth}
+\setlength{\abovecaptionskip}{0pt}%
+\setlength{\belowcaptionskip}{5pt}%
+\captionof{table}{VUS-PR per dataset and averages over five datasets (from the original paper; selected baselines).}%
+\label{tab:main}%
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}%
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lcccccccc@{}}
+\toprule
+\textbf{Method} & \textbf{UCR} & \textbf{AIOps} & \textbf{SMD} & \textbf{SMAP} & \textbf{MSL} & \textbf{Avg V-R} & \textbf{Avg V-P} & \textbf{Avg RF} \\
+\midrule
+IsolationForest  & 0.106 & 0.169 & 0.245 & 0.137 & 0.208 & 0.653 & 0.173 & 0.067 \\
+OCSVM            & 0.167 & 0.336 & 0.239 & 0.345 & 0.428 & 0.704 & 0.303 & 0.093 \\
+BeatGAN          & 0.205 & \textbf{0.487} & 0.356 & 0.309 & 0.395 & 0.756 & 0.350 & 0.181 \\
+AT               & 0.132 & 0.347 & \textbf{0.420} & 0.291 & 0.290 & 0.746 & 0.296 & 0.157 \\
+D3R              & 0.071 & 0.396 & 0.330 & 0.304 & \textbf{0.484} & 0.718 & 0.317 & 0.187 \\
+COUTA            & 0.062 & 0.187 & 0.268 & 0.258 & 0.376 & 0.675 & 0.230 & 0.104 \\
+CutAddPaste      & 0.441 & 0.260 & 0.235 & \textbf{0.406} & 0.432 & 0.724 & 0.355 & 0.148 \\
+\midrule
+\textbf{RedLamp} & \textbf{0.492} & 0.448 & 0.366 & 0.360 & 0.482 & \textbf{0.803} & \textbf{0.430} & \textbf{0.219} \\
+\bottomrule
+\end{tabular}%
+}
+\end{minipage}\par\vspace{0pt plus 3pt}
+
+\subsection{Reproduction}
+Table~\ref{tab:repro} compares our retrained RedLamp with the paper. On AIOps and SMD we slightly exceed the published scores, and on MSL we stay within 0.022 on every metric, a gap comparable to the seed standard deviation. SMAP shows the largest shortfall (V-P $-0.031$, RF $-0.054$). We attribute this to details the paper leaves unstated (the RF threshold and the window-to-timestep alignment), to different random streams under early stopping, and to the SMAP channel list, which contains P-2 twice. UCR (250 series $\times$ 5 seeds) has not been retrained yet.
+
+\par\vspace{5pt plus 6pt minus 3pt}\noindent
+\begin{minipage}[b]{\columnwidth}
+\setlength{\abovecaptionskip}{0pt}%
+\setlength{\belowcaptionskip}{5pt}%
+\captionof{table}{Our reproduction (mean $\pm$ std over 5 seeds) versus the original paper.}%
+\label{tab:repro}%
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4.5pt}%
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+& \multicolumn{2}{c}{\textbf{VUS-ROC}} & \multicolumn{2}{c}{\textbf{VUS-PR}} & \multicolumn{2}{c}{\textbf{Range-F}} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+\textbf{Dataset} & \textbf{Ours} & \textbf{Paper} & \textbf{Ours} & \textbf{Paper} & \textbf{Ours} & \textbf{Paper} \\
+\midrule
+UCR*  & 0.890 & 0.897 & 0.334 & 0.492 & 0.178 & 0.234 \\
+AIOps & 0.926 & 0.911 & 0.458 & 0.448 & 0.180 & 0.179 \\
+SMD   & 0.823 & 0.813 & 0.374 & 0.366 & 0.239 & 0.235 \\
+SMAP  & 0.628 & 0.642 & 0.329 & 0.360 & 0.142 & 0.196 \\
+MSL   & 0.731 & 0.753 & 0.469 & 0.482 & 0.244 & 0.254 \\
+\bottomrule
+\multicolumn{7}{@{}l}{\footnotesize * Evaluated on all 250 entities under single seed.}
+\end{tabular}%
+}
+\end{minipage}\par\vspace{2pt plus 3pt minus 2pt}
+
+\subsection{Ablation and Robustness}
+According to the paper's ablation, every component contributes. Removing $\mathcal{L}_{MSE}$ or $\mathcal{L}_{CE}$ lowers V-P by 12--24\%, and replacing the multiclass head with binary classification lowers it by 15.3\% (UCR) and 24.5\% (SMD). The anomaly mask and backward correction matter most on UCR ($-9.1\%$, $-4.0\%$), and FAA matters most on SMD ($-8.9\%$). Under 5\% training contamination, RedLamp loses only 1.8\% of its performance, compared with 15.5\% for CutAddPaste. These studies were not reproduced, since the official code does not include the ablated variants.
+
+\subsection{Discussion}
+The results support the multiclass assumption, but with caveats. FAA rescales scores using statistics of the whole test set, the 11 augmentations are hand-designed and their usefulness varies by dataset, and the paper does not report computational cost.
+
+\section{Task Distribution}
+Table~\ref{tab:task_dist} summarizes the workload distribution across team members.
+
+\par\vspace{6pt plus 3pt minus 2pt}\noindent
+\begin{minipage}[b]{\columnwidth}
+\setlength{\abovecaptionskip}{0pt}%
+\setlength{\belowcaptionskip}{5pt}%
+\captionof{table}{Task distribution across team members.}%
+\label{tab:task_dist}%
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4.5pt}%
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+& \multicolumn{5}{c}{\textbf{Member}} \\
+\cmidrule(lr){2-6}
+\textbf{Task} & \textbf{Bao$^*$} & \textbf{Duy} & \textbf{Anh} & \textbf{Cuong} & \textbf{Danh} \\
+\midrule
+Research                    & 20 & 20 & 20 & 20 & 20 \\
+Rerun model                 & 40 & 10 & 0  & 10 & 40 \\
+EDA                         & 0  & 0  & 80 & 20 & 0  \\
+Build demo                  & 0  & 70 & 0  & 30 & 0  \\
+Model evaluation            & 40 & 0  & 0  & 0  & 60 \\
+Report + Slide + Presenting & 20 & 20 & 20 & 20 & 20 \\
+\midrule
+\textbf{Distribute}         & \textbf{120} & \textbf{120} & \textbf{120} & \textbf{100} & \textbf{140} \\
+\midrule
+\textbf{Percentage}         & \textbf{20\%} & \textbf{20\%} & \textbf{20\%} & \textbf{16.7\%} & \textbf{23.3\%} \\
+\bottomrule
+\multicolumn{6}{@{}l}{\footnotesize $^*$ Leader.}
+\end{tabular}%
+}
+\end{minipage}\par
+
+\end{document}
