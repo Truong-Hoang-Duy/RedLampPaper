@@ -9,27 +9,27 @@
 
 ### 1.1. Giới thiệu 5 bộ dữ liệu & cấu hình thực nghiệm trên `SMD`
 
-> *"Em chào thầy và các bạn, hôm nay em xin đại diện **Nhóm 1** thuyết trình về kết quả mà nhóm đã trực tiếp huấn luyện lại mô hình **REDLAMP** trên **5 bộ dữ liệu chuẩn**: gồm dữ liệu máy chủ công nghiệp `SMD`, chỉ số KPI đám mây `AIOps`, dữ liệu tàu tự hành Sao Hỏa `MSL` và vệ tinh `SMAP` của NASA, cùng kho dữ liệu chuỗi thời gian đa lĩnh vực `UCR`.*
+> *"Em chào thầy và các bạn, em xin trình bày **kết quả thực nghiệm và Demo trực tiếp** mô hình **REDLAMP** mà nhóm đã huấn luyện lại trên **5 bộ dữ liệu chuẩn**.*
 >
-> *Em xin lấy ví dụ bộ dữ liệu **`SMD`**, gồm **28 máy chủ** độc lập, mỗi máy chủ có **38 đặc trưng cảm biến (`D1 – D38`)** theo dõi đồng thời CPU, RAM, ổ cứng và lưu lượng mạng. Nhóm tổng hợp kết quả chung trên toàn bộ 28 máy (`ALL`) và huấn luyện độc lập qua **5 seed (`Seed 0 – 4`)** để đánh giá độ ổn định của mô hình với các vị trí chèn lỗi giả lập và khởi tạo trọng số ngẫu nhiên khác nhau."*
+> *Mở đầu với bộ dữ liệu **`SMD`**, tập này gồm **28 máy chủ**, mỗi máy có **38 đặc trưng** theo dõi CPU, RAM, ổ cứng và mạng. Nhóm tổng hợp kết quả trên cả 28 máy và chạy độc lập qua **5 seed** để kiểm tra độ ổn định của mô hình."*
 
 ---
 
 ### 1.2. Kết quả đánh giá chất lượng qua 3 thông số (`VUS-ROC`, `VUS-PR`, `RF`)
 
-> *"Về **kết quả đánh giá chất lượng**, mô hình được đánh giá qua **3 thông số** trên thang điểm từ `0` đến `1` (càng gần `1` càng tốt):*
+> *"Về **kết quả đánh giá chất lượng**, mô hình được đánh giá qua **3 thông số** trên thang điểm từ `0` đến `1`:*
 >
-> * *`VUS-ROC`: đo **khả năng phân biệt giữa vùng bình thường và vùng sự cố** (có dung sai nhẹ quanh rìa sự cố), trung bình 5 seed đạt **`0.823 ± 0.005`**.*
-> * *`VUS-PR`: đánh giá **độ chính xác mỗi khi mô hình phát cảnh báo**, đạt **`0.374 ± 0.013`** — nhỉnh hơn nhẹ mức `0.366` của bài báo gốc.*
-> * *`RF (Range F-score)`: đo **độ phủ trùng khớp và liền mạch** trên đợt sự cố thật sau khi cắt ngưỡng tự động, đạt **`0.239 ± 0.009`**."*
+> * *`VUS-ROC`: đo **khả năng phân tách tổng thể** giữa vùng bình thường và vùng sự cố trên toàn chuỗi, trung bình 5 seed đạt **`0.823`** với độ lệch chuẩn chỉ **`0.005`**.*
+> * *`VUS-PR`: dữ liệu thực tế thường ít gặp lỗi, vì vậy thông số này **trừ điểm rất nặng khi mô hình báo lỗi nhầm** — trung bình 5 seed đạt **`0.374`** với độ lệch chuẩn chỉ **`0.013`**.*
+> * *`RF (Range F-score)`: đo **độ phủ trùng khớp và liền mạch** theo từng đoạn sự cố sau khi cắt ngưỡng tự động, trung bình 5 seed đạt **`0.239`** với độ lệch chuẩn chỉ **`0.009`**."*
 
 ---
 
 ### 1.3. So sánh 28 máy chủ & đi sâu vào máy `machine-2-8`
 
-> *"Xét riêng thông số đo trên từng máy trong **28 máy chủ** của tập `SMD` đối chiếu với mức trung bình toàn tập (`0.3569` ở `Seed 0`), máy nổi bật nhất là **`machine-2-8` (`m2-8`)** với khả năng phát hiện bất thường đạt hiệu quả cao nhất: `VUS-PR` đạt **`0.9818`** và `VUS-ROC` đạt **`0.9999`**.*
+> *"Khi đối chiếu riêng từng máy trong **28 máy chủ** ở `Seed 0`, mức trung bình toàn tập dừng ở `0.3569` là do một số máy có tín hiệu nhiễu phức tạp dễ gây báo nhầm nên bị trừ điểm mạnh; ngược lại ở máy nổi bật nhất là **`machine-2-8` (`m2-8`)**, mô hình gần như không bị trừ điểm, đạt **`VUS-PR` tới `0.9818`** và **`VUS-ROC` đạt `0.9999`** — sát mức `1.0` tuyệt đối.*
 >
-> *Đi vào chuỗi thời gian thực tế dài **`23,605` bước** của **`machine-2-8`**, tín hiệu gốc của đặc trưng cảm biến (`D1`, trong tổng số 38 đặc trưng `D1 – D38`) được đặt cùng đường điểm bất thường tương đối màu đỏ do REDLAMP dự đoán. Suốt giai đoạn dài từ đầu chuỗi tới mốc `16,000`, khi máy vận hành bình thường, điểm bất thường giữ ở mức thấp ổn định và không báo giả. Ngay khi phát sinh sự cố quanh mốc **`t = 17,587`**, tín hiệu cảm biến biến động vọt cao và điểm bất thường của REDLAMP lập tức dựng đứng chạm đỉnh **`1.00`** — với điểm kết hợp thô đạt `0.5689`, vượt xa ngưỡng tự động (`0.3257`), xác nhận chính xác trạng thái bất thường."*
+> *Điều này thấy rất rõ khi mở chuỗi thời gian dài **`23,605` bước** của **`machine-2-8`**: suốt giai đoạn dài từ đầu chuỗi tới mốc `16,000` khi máy chạy bình thường, đường điểm bất thường màu đỏ nằm sát đáy và **không báo lỗi nhầm lần nào**. Ngay khi phát sinh sự cố quanh mốc **`t = 17,587`**, cảm biến biến động mạnh và đường điểm đỏ lập tức vọt thẳng lên đỉnh **`1.00`**, bắt trúng trọn vẹn đợt sự cố."*
 
 ---
 
@@ -37,13 +37,13 @@
 
 ### 2.0. Mở đầu cơ chế giải thích 5 bước
 
-> *"Tiếp theo, nhóm sẽ đi sâu vào phân tích từng bước bên trong mạng `ConvAEC` để làm rõ vì sao mô hình kết luận bất thường — thông qua **5 bước tuần tự**: `Đầu vào` → `Encoder` → `Decoder` → `Classifier` → `Kết hợp`, trong đó **cửa sổ sự cố** luôn được đặt đối chiếu trực tiếp với một **cửa sổ chuẩn bình thường**."*
+> *"Tiếp theo, nhóm sẽ đi sâu vào phân tích từng bước bên trong **mạng nơ-ron của REDLAMP** để làm rõ vì sao mô hình kết luận bất thường — thông qua **5 bước tuần tự**: `Đầu vào` → `Encoder` → `Decoder` → `Classifier` → `Kết hợp`, trong đó **cửa sổ sự cố** luôn được đặt đối chiếu trực tiếp với một **cửa sổ chuẩn bình thường**."*
 
 ---
 
 ### 2.1. Bước 1/5 (`Đầu vào`)
 
-> *"Ở **Bước 1 — Đầu vào**: thay vì chỉ xét rời rạc một thời điểm đơn lẻ, REDLAMP sử dụng một cửa sổ trượt độ dài **`W = 100` bước** liên tiếp trên toàn bộ **`38` kênh cảm biến**, giúp mô hình nắm bắt trọn vẹn bối cảnh biến thiên trước và trong khi máy phát sinh lỗi."*
+> *"Ở **Bước 1 — Đầu vào**: thay vì chỉ xét rời rạc một thời điểm đơn lẻ, REDLAMP sử dụng một cửa sổ trượt độ dài **`W = 100` bước** liên tiếp trên toàn bộ **`38` kênh cảm biến**, giúp mô hình nắm bắt trọn vẹn bối cảnh trước và trong khi máy phát sinh lỗi."*
 
 ---
 
@@ -57,11 +57,11 @@
 
 ### 2.3. Bước 3/5 (`Decoder` & Mặt nạ `Anomaly Mask`)
 
-* **Trạng thái 1 — Mặc định `TẮT Mask` (Chế độ Kiểm thử):**
-> *"Ở **Bước 3 — Nhánh `Decoder` và `Anomaly Mask`**: từ vector `128` chiều, `Decoder` khôi phục lại cửa sổ `38` cảm biến trong `100` bước (`3,800` phần tử). Khi **kiểm thử thực tế (tắt `Anomaly Mask`)**, toàn bộ `3,800` phần tử đều được mở để tính sai số: ở **cửa sổ chuẩn**, đường tái tạo màu xanh bám sát tín hiệu gốc với `MSE` rất nhỏ (`0.0003`); còn ở **cửa sổ sự cố**, dù tín hiệu gốc giật vọt lên sát mức `1.0`, đường tái tạo vẫn giữ nền ổn định quanh `0.15`, làm lộ vùng lệch đỏ rất lớn và đẩy `MSE` vọt lên gần `0.14` — gấp khoảng `400` lần mức chuẩn."*
+* **Trạng thái 1 — Mặc định `TẮT Mask` (Chế độ Kiểm thử thực tế):**
+> *"Sau khi qua `Encoder`, hệ thống chuyển sang **Bước 3 — `Decoder`**: ở cửa sổ sự cố bên trái, dữ liệu gốc màu đen vọt bất thường lên gần `1.0`, nhưng nhờ **lúc huấn luyện** lớp `Mask` đã che gai lỗi đi để tránh học quá kỹ, nên `Decoder` chỉ tái tạo lại đường màu xanh dương nằm thấp ở dưới — làm độ chênh lệch `MSE` giữa đường đen và đường xanh **vọt lên tới khoảng `0.13`**, cao gấp gần `400` lần so với cửa sổ chuẩn bên phải (`0.0003`)."*
 
-* **Trạng thái 2 — Chuyển sang `BẬT Mask` (Mô phỏng Huấn luyện):**
-> *"Đường tái tạo giữ được nền ổn định mà không vẽ chạy theo đỉnh lỗi là nhờ cơ chế **bật `Anomaly Mask` trong lúc huấn luyện**: ở cửa sổ chuẩn mọi phần tử đều được giữ nguyên (`1` — dải xanh lá), nhưng ở cửa sổ có lỗi, mô hình chỉ giữ lại đoạn sóng êm ở giữa và **phủ mặt nạ che lỗi (`0` — vùng sọc vàng)** lên hơn `56%` số phần tử đang vọt cao bất thường. Khi khóa sai số vùng lỗi về `0`, `MSE` giảm mạnh từ `0.14` xuống chỉ còn **`0.0006`** — nhờ vậy `Decoder` không bị ép học theo gai nhiễu mà chỉ học quy luật sóng bình thường."*
+* **Trạng thái 2 — Chuyển sang `BẬT Mask` (Mô phỏng lúc Huấn luyện):**
+> *"Và khi bật mô phỏng `Anomaly Mask` của lúc huấn luyện lên, các vùng vọt cao lập tức bị che về `0` (vùng sọc vàng), chỉ giữ lại đoạn êm nên `MSE` hạ xuống còn **`0.0006`** — minh họa trực tiếp lý do `Decoder` chỉ học vẽ sóng bình thường."*
 
 ---
 

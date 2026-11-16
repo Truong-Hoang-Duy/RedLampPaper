@@ -29,23 +29,30 @@ Trước khi đi vào từng phép nhân chi tiết, hãy nhìn **2 sơ đồ t�
                                                      ▼  Đưa trọn vẹn X = [0.20, 0.20, 1.00, 0.20] vào mạng
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │ [CHẶNG 1] THÂN CHUNG: CONV-ENCODER (models/cnn.py -> ConvEncoder) — Nén cửa sổ [100×38] về [128×1]       │
+│  [?] Vì sao nén [100×38] (3,800 số) về [128×1]?                                                          │
+│      • Tạo "nút cổ chai" ép mạng chỉ giữ quy luật chuẩn, ngăn Decoder copy-paste nguyên xi cả gai lỗi.   │
+│      • Gom trục thời gian 100 ──► 1 để lỗi nằm đầu, giữa hay cuối cửa sổ đều bắt trúng như nhau.         │
 │                                                                                                          │
 │  1) Đảo trục để trượt theo thời gian: [100 bước × 38 kênh] ──► [38 kênh × 100 bước]                      │
 │                                                                                                          │
 │  2) Đi qua 4 khối ConvBlock 1D nối tiếp (kernel k=4, stride s=2, pad p=2 => T_mới = ⌊T_cũ/2⌋ + 1):       │
 │     Kích thước: [38×100] ──► Khối 0:[128×51] ──► Khối 1:[128×26] ──► Khối 2:[256×14] ──► Khối 3:[256×8]  │
 │                                                                                                          │
-│     * Phép tính cụ thể bên trong 1 khối (ví dụ Bộ lọc #1 dò gai [-1, -1, +3, -1] trượt trên X):          │
-│       (a) Conv1d (Nhân-cộng cửa sổ 4 bước, nhảy s=2 bước/lần):                                           │
-│           • Đoạn phẳng [0.20, 0.20, 0.20, 0.20]: 0.2(-1) + 0.2(-1) + 0.2(+3) + 0.2(-1) =  0.00           │
-│           • Trúng gai  [0.20, 0.20, 1.00, 0.20]: 0.2(-1) + 0.2(-1) + 1.0(+3) + 0.2(-1) = +2.40 (bắt gai!)│
-│           ──► Dãy tích chập thô:               [+0.40, -0.80, +2.40,  0.00,  0.00, ...]                  │
-│       (b) BatchNorm1d — Chuẩn hóa (x - μ)/σ về trung bình 0, phương sai 1:                               │
-│           ──► Sau chuẩn hóa biên độ:           [ 0.00, -1.20, +2.00, -0.40, -0.40, ...]                  │
+│     * Phép tính cụ thể bên trong 1 khối (Bộ lọc #1 dò gai [-1, -1, +3, -1], k=4, stride s=2, pad p=2):   │
+│       Do padding = 2 nên trước khi trượt, đầu chuỗi X được đệm thêm hai số 0:                            │
+│       X_đệm = [ 0,  0,  0.20,  0.20,  1.00,  0.20,  0.20,  0.20,  0.20,  0.20, ... ]                     │
+│       (a) Conv1d (Nhân-cộng thước 4 ô từ trái sang phải, mỗi nhịp nhảy s=2 ô):                           │
+│           • Nhịp 1 [ 0  ,  0  , 0.20, 0.20] (2 số 0 đệm đầu): 0(-1)+0(-1)+0.2(+3)+0.2(-1)   = +0.40      │
+│           • Nhịp 2 [0.20, 0.20, 1.00, 0.20] (trúng gai!):     0.2(-1)+0.2(-1)+1.0(+3)+0.2(-1) = +2.40    │
+│           • Nhịp 3 [1.00, 0.20, 0.20, 0.20] (gai lùi rìa):    1.0(-1)+0.2(-1)+0.2(+3)+0.2(-1) = -0.80    │
+│           • Nhịp 4,5 [0.20, 0.20, 0.20, 0.20] (đoạn phẳng):   0.2(-1)+0.2(-1)+0.2(+3)+0.2(-1) =  0.00    │
+│           ──► Dãy tích chập thô 5 nhịp đầu:    [+0.40, +2.40, -0.80,  0.00,  0.00, ...]                  │
+│       (b) BatchNorm1d — Chuẩn hóa (x - μ)/σ (với trung bình 5 nhịp μ = 2.00/5 = 0.40, σ = 1.0):          │
+│           ──► Sau chuẩn hóa biên độ:           [ 0.00, +2.00, -1.20, -0.40, -0.40, ...]                  │
 │       (c) ReLU — Hàm max(0, x) giữ số dương, cắt toàn bộ số âm về 0:                                     │
-│           ──► Chỉ còn điểm gai dương nổi bật:  [ 0.00,  0.00, +2.00,  0.00,  0.00, ...]                  │
+│           ──► Chỉ còn điểm gai dương nổi bật:  [ 0.00, +2.00,  0.00,  0.00,  0.00, ...]                  │
 │       (d) Dropout(0.2) (chỉ bật lúc Train) — Tắt ngẫu nhiên 20% về 0, số còn lại nhân bù ×1.25:          │
-│           ──► Đầu ra khối tích chập:           [ 0.00,  0.00, +2.50,  0.00,  0.00, ...]                  │
+│           ──► Đầu ra khối tích chập:           [ 0.00, +2.50,  0.00,  0.00,  0.00, ...]                  │
 │                                                                                                          │
 │  3) Global MaxPool1d (kernel=8): Quét hết 8 mốc thời gian còn lại trên từng kênh, lấy 1 số lớn nhất:     │
 │     • Kênh #1: max([0.00, +2.50, 0.10, 0.00, 0.05, 0.00, 0.00, 0.00]) = +2.50                            │
@@ -79,60 +86,97 @@ Trước khi đi vào từng phép nhân chi tiết, hãy nhìn **2 sơ đồ t�
                            │                                                                │
                            ▼                                                                ▼
 ╔═════════════════════════════════════════════════════╗          ╔═════════════════════════════════════════════════════╗
-║ [CHẶNG 4A] CHỐT CHẶN ANOMALY MASK (Tính Loss L_MSE) ║          ║ [CHẶNG 4B] ĐỐI CHIẾU NHÃN MỀM (Tính Loss L_CE)      ║
-║ Lấy tờ anomaly_mask = [1, 1, 0, 1] nhân vào CẢ HAI: ║          ║ So khớp y_hat với nhãn mềm y_tilde [0.11, 0.79,...]:║
-║  • X     * mask: [0.20, 0.20, 1.00, 0.20]*[1,1,0,1] ║          ║  L_CE = -∑ y_tilde_i · ln(y_hat_i)                  ║
-║                = [0.20, 0.20,  0  , 0.20]           ║          ║       = -(0.11·ln 0.10 + 0.79·ln 0.80 + ...) ≈ 1.65 ║
-║  • X_hat * mask: [0.21, 0.20, 0.22, 0.20]*[1,1,0,1] ║          ╚══════════════════════════╤══════════════════════════╝
-║                = [0.21, 0.20,  0  , 0.20]           ║                                     │
-║  • Giây 1: (0.20 - 0.21)² = 0.0001 (chấm ô chuẩn)   ║                                     │
-║  • Giây 3: (  0  -   0  )² = 0     (KHÔNG PHẠT!)    ║                                     │
-║  ──► L_MSE trung bình cực nhỏ ≈ 0.0002              ║                                     │
-╚══════════════════════════╤══════════════════════════╝                                     │
+║ [CHẶNG 4A] CHỐT CHẶN ANOMALY MASK (Tính Loss L_MSE) ║          ║ [CHẶNG 4B] ĐỐI CHIẾU ĐÁP ÁN MỀM (Tính Loss L_CE)    ║
+║ Lấy tờ anomaly_mask = [1, 1, 0, 1] nhân vào CẢ HAI: ║          ║ So bài làm y_hat [0.10, 0.80..] & đáp án [0.11,0.79]║
+║  • X     * mask = [0.20, 0.20,  0  , 0.20]          ║          ║  L_CE = -∑ đáp_án_i · ln(dự_đoán_i)                 ║
+║  • X_hat * mask = [0.21, 0.20,  0  , 0.20]          ║          ║  • Giả sử đoán đúng 80% Spike: -0.79·ln(0.80)≈0.18  ║
+║  • Giây 1 (Mask=1): (0.20-0.21)² = 0.0001 (ô chuẩn) ║          ║    (cộng đủ 12 lớp L_CE ≈ 0.89 ──► Điểm phạt thấp!) ║
+║  • Giây 3 (Mask=0): (  0 -  0 )² = 0  (KHÔNG PHẠT!) ║          ║                                                     ║
+║  [!] KHI NÀO BỊ PHẠT NẶNG?                          ║          ║  [!] KHI NÀO BỊ PHẠT NẶNG?                          ║
+║  • Vẽ sai ở ô chuẩn Mask=1 (vd mới học vẽ bừa 0.80, ║          ║  • Bỏ sót/đoán sai (vd chỉ đoán 1% Spike, 89% chuẩn)║
+║    hoặc gai Giây 3 kéo lệch lây sang Giây 2 = 0.80):║          ║    riêng Spike phạt: -0.79·ln(0.01)=3.64 (tổng 4.11)║
+║    Giây 2: (0.20 - 0.80)² = 0.3600 ──► PHẠT NẶNG!   ║          ║    ──► PHẠT NẶNG GẤP ~5×, ép phải bắt trúng Spike!  ║
+║    ──► Ép Decoder luôn giữ phẳng vùng bình thường!  ║          ║                                                     ║
+╚══════════════════════════╤══════════════════════════╝          ╚══════════════════════════╤══════════════════════════╝
                            └──────────────────────────┐          ┌──────────────────────────┘
                                                       ▼          ▼
                                     [CHẶNG 5] TỔNG HỢP LOSS & CẬP NHẬT TRỌNG SỐ
-                                    L = 0.9·L_MSE + 0.1·L_CE = 0.9(0.0002) + 0.1(1.65) = 0.16518
+                                    L = 0.9·L_MSE + 0.1·L_CE = 0.9(0.0002) + 0.1(0.89) = 0.08918
                                     ──► Lan truyền ngược (AdamW) tinh chỉnh bộ lọc cho bước kế tiếp!
 ```
 
 ---
 
-### 0.2. Luồng Kiểm Thử & Dự Đoán Thực Tế (`TEST / LIVE DEMO`) — Tắt `Dropout` & Tháo bỏ `Mask` để bắt lỗi!
+### 0.2. Luồng Kiểm Thử, Dự Đoán & Chấm Điểm (`TEST / EVALUATE`) — Từ Tín Hiệu Thực Tới `VUS-ROC`, `VUS-PR`, `RF`
 
-Khi mang mô hình đã nạp `bestmodel.pkl` ra chạy thực tế (hoặc bấm trên **Web Demo**), dữ liệu đi vào là cảm biến thật **chưa biết chỗ nào có lỗi**, nên **KHÔNG bơm lỗi giả**, **TẮT `Dropout` trong Encoder/Decoder/Classifier**, và **KHÔNG che `Anomaly Mask`** (mở `Mask = 1` toàn bộ `100×38` ô):
+Khi mang mô hình đã nạp `bestmodel.pkl` ra chạy kiểm thử (hoặc trên **Web Demo**), dữ liệu đi vào là cảm biến thật **chưa biết chỗ nào có lỗi**, nên **KHÔNG bơm lỗi giả**, **TẮT `Dropout`**, và **KHÔNG che `Anomaly Mask`** (mở `Mask = 1` toàn bộ `100×38` ô). Sau khi trượt hết toàn bộ tập `Test` thu được chuỗi điểm `s(t)`, hệ thống mới bước sang **Chặng Đánh Giá** đối chiếu `s(t)` với nhãn sự cố thật `Y(t)` để tính ra `VUS-ROC`, `VUS-PR` và `RF`:
 
 ```text
-Tín hiệu thực tế X = [0.20, 0.20, 1.00 (Sự cố thật!), 0.20]
+Tín hiệu thực tế X = [0.20, 0.20, 1.00 (Sự cố thật!), 0.20]   (trượt Stride = 1 dọc toàn chuỗi Test)
                               │
                               ▼
          ┌─────────────────────────────────────────┐
-         │ ENCODER (chế độ eval: TẮT Dropout)      │
+         │ [TEST 1] ENCODER (eval: TẮT Dropout)    │
          │ 4 ConvBlock (100→51→26→14→8)            │
          │ ──► MaxPool1d(8→1) ──► Conv1x1(256→128) │
          └────────────────────┬────────────────────┘
                               │
                               ▼  Embedding z [128 số thực] (lệch mạnh khỏi vùng chuẩn 0)
-              ┌───────────────┴───────────────────────────────┐
-              ▼                                               ▼
-   DECODER (1→8→14→26→51→100)                      CLASSIFIER (128→32→12 + Softmax)
-   (Do lúc Train được Mask bảo vệ                  (Nhận diện hình thái sóng đang
-    nên chỉ biết vẽ lại sóng chuẩn!)                giống lớp lỗi giả nào nhất)
-              │                                               │
-              ▼                                               ▼
-   X_hat = [0.21, 0.20, 0.22, 0.20]                Dự đoán: 99% thuộc lớp "Spike"
-              │                                    + Lọc FAA: gạch về 0 các lớp > 5% chuỗi
-              ▼                                               │
-   KHÔNG CHE MASK (tính đủ 100% các ô):                       ▼
-   Tại giây 3: (1.00 - 0.22)² = 0.6084!            Điểm phân loại s_CE = ∑ p_lỗi_hợp_lệ ≈ 0.99
-   ──► Điểm tái tạo s_MSE VỌT GẤP 6000×!                      │
-              │                                               │
-              └───────────────┬───────────────────────────────┘
-                              ▼
-             ĐIỂM BẤT THƯỜNG KẾT HỢP (Combined Score)
-             • Cửa sổ đơn (Tab 2 & Tab 3 Demo): Raw Combined = (s_MSE + s_CE) / 2  so với  μ + 3σ
-             • Toàn chuỗi (Tab 1 & Chấm điểm):  s(t) = 0.5·MinMax(MA_50(s_MSE)) + 0.5·MinMax(MA_50(s_CE))
-             ──► VƯỢT NGƯỠNG ──► BÁO ĐỘNG BẤT THƯỜNG!
+                       ┌────────────────────────────┴───────────────────────────┐
+                       ▼                                                        ▼
+┌─────────────────────────────────────────────┐    ┌───────────────────────────────────────────────────────┐
+│ [TEST 2A] DECODER (1→8→14→26→51→100)        │    │ [TEST 2B] CLASSIFIER (128→32→12) + BỘ LỌC FAA         │
+│  • Do lúc Train được Mask bảo vệ nên chỉ    │    │  1) Dự đoán xác suất 12 lớp (vd: 99% thuộc "Spike").  │
+│    biết vẽ lại sóng chuẩn:                  │    │  2) Bộ lọc FAA: gạch về 0 các lớp có trung bình > 5%! │
+│    X_hat = [0.21, 0.20, 0.22, 0.20]         │    │     [?] Vì sao cần FAA? Mỗi máy chủ có "thói quen     │
+│  • KHÔNG CHE MASK (mở 100% các ô để chấm):  │    │     hoạt động bình thường" riêng vô tình giống 1 kiểu │
+│    Tại giây 3: (1.00 - 0.22)² = 0.6084!     │    │     lỗi giả (vd: giờ hành chính chạy nhịp nhanh hơn   │
+│    ──► Điểm tái tạo s_MSE VỌT GẤP 6000×!    │    │     ban đêm ──► cứ giờ hành chính lại đoán nhầm sang  │
+│                                             │    │     lỗi speedup suốt 15%–20% toàn chuỗi, gây báo động │
+│                                             │    │     giả liên tục! ──► FAA tự gạch bỏ lớp > 5% chuỗi). │
+│                                             │    │  3) Điểm phân loại s_CE = ∑ p_lỗi_hợp_lệ ≈ 0.99       │
+└──────────────────────┬──────────────────────┘    └───────────────────────────┬───────────────────────────┘
+                       └────────────────────────────┬──────────────────────────┘
+                                                    ▼
+         ┌───────────────────────────────────────────────────────────────────────────────────┐
+         │ [TEST 3] TỔNG HỢP ĐIỂM BẤT THƯỜNG (Combined Score — bước cuối cùng trên Demo)      │
+         │  • Cửa sổ đơn (Tab 2 & Tab 3): Raw Combined = (s_MSE + s_CE) / 2  so với  μ + 3σ  │
+         │  • Toàn chuỗi Test (Tab 1):    s(t) = 0.5·MinMax(MA_50(s_MSE))                    │
+         │                                     + 0.5·MinMax(MA_50(s_CE))  ∈ [0, 1]           │
+         └─────────────────────────────────────────┬─────────────────────────────────────────┘
+                                                   │
+                                                   ▼  Đem toàn mảng s(t) đối chiếu Nhãn thật Y(t)
+╔══════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║ [TEST 4] CHẤM ĐIỂM ĐÁNH GIÁ CHẤT LƯỢNG (evaluate.py — Chỉ chạy trên tập Test có sẵn đáp án Y(t))        ║
+║                                                                                                          ║
+║  Ví dụ chuỗi Test 8 giây (trong đó sự cố thật kéo dài 3 giây liên tiếp từ t=3 đến t=5):                  ║
+║    t (giây):           t=0    t=1    t=2 (báo nhầm!)   t=3    t=4    t=5    t=6    t=7                   ║
+║    Điểm mô hình s(t): [0.05,  0.08,  0.48,             0.85,  0.92,  0.88,  0.12,  0.04]                 ║
+║    Nhãn thật    Y(t): [  0 ,    0 ,    0 ,               1 ,    1 ,    1 ,    0 ,    0 ]                 ║
+║                                                        └──── Đoạn sự cố thật ────┘                       ║
+║                                                                                                          ║
+║  Từ cặp { s(t), Y(t) } này, hệ thống tính ra 3 thông số trên Tab 1 theo 3 góc nhìn hoàn toàn khác nhau:  ║
+║                                                                                                          ║
+║  (1) VUS-ROC (Quét mọi ngưỡng τ + vùng đệm mềm ℓ=0..100 — Góc nhìn TOÀN CHUỖI):                          ║
+║      • So sánh điểm vùng lỗi [0.85, 0.92, 0.88] với TOÀN BỘ 5 điểm bình thường [0.05, 0.08, 0.48,...].   ║
+║      • Tại ngưỡng τ = 0.40: bắt hết 3/3 lỗi (TPR = 100%), chỉ nhầm 1/5 điểm chuẩn (FPR = 20%; trên chuỗi ║
+║        thực tế hàng vạn điểm chuẩn thì FPR ≈ 0.1% rất nhỏ!) ──► VUS-ROC thường rất cao (SMD: 0.823).     ║
+║                                                                                                          ║
+║  (2) VUS-PR  (Quét mọi ngưỡng τ + vùng đệm mềm ℓ=0..100 — Góc nhìn DỮ LIỆU HIẾM LỖI / PHẠT BÁO NHẦM):    ║
+║      • Bỏ qua nền 0 khổng lồ, CHỈ soi vào các điểm bị báo lỗi xem tỷ lệ đúng thật (Precision) là bao     ║
+║        nhiêu: tại τ = 0.40 có 4 điểm vượt ngưỡng [0.48, 0.85, 0.92, 0.88] nhưng t=2 (0.48) là báo nhầm   ║
+║        ──► Precision = 3/4 = 75% (trên chuỗi thật lỗi hiếm 4%, báo nhầm vài chục điểm kéo tụt xuống ~0.37)║
+║        ──► Thước đo KHẮT KHE NHẤT để xếp hạng mô hình (SMD: 0.374 ± 0.013).                              ║
+║                                                                                                          ║
+║  (3) RF — Range F-score (Cắt 1 ngưỡng tự động τ = μ + 3σ — Góc nhìn ĐỘ PHỦ & ĐỘ LIỀN MẠCH ĐOẠN LỖI):     ║
+║      • Đổi s(t) > τ thành dãy nhị phân 0/1 rồi chấm trực tiếp trên ĐOẠN sự cố [t=3..5]:                  ║
+║        - Nếu dự đoán LIỀN MẠCH 1 đoạn [0, 0, 0, 1, 1, 1, 0, 0] (k=1 mảnh): khớp trọn, KHÔNG bị phạt!     ║
+║        - Nếu dự đoán ĐỨT KHÚC 2 mảnh  [0, 0, 0, 1, 0, 1, 0, 0] (k=2 mảnh): làm kỹ sư tưởng 2 lỗi rời,    ║
+║          bị chia phạt hệ số 1/k = 1/2 số điểm! (SMD: 0.239 ± 0.009).                                     ║
+║                                                                                                          ║
+║  (4) Gộp toàn tập (Entity = ALL) & 5 Seeds (Seed 0..4):                                                  ║
+║      • Tính trung bình 28 máy trong từng Seed ──► Lấy Trung bình ± Độ lệch chuẩn qua 5 lần chạy độc lập. ║
+╚══════════════════════════════════════════════════════════════════════════════════════════════════════════╝
 ```
 
 > [!IMPORTANT]
@@ -226,17 +270,17 @@ Ta cắt được bảng gốc `Z` kích thước **`100 dòng × 38 cột`** (`
 ---
 
 ### Bước 2: Chèn 1 lỗi giả `Spike` (Gai nhọn — Lớp số `1`)
-Hàm `_inject_spike` trong `RedLamp/loaders/loader_aug.py` chọn ngẫu nhiên thời điểm **`t = 3`** trên kênh **`D1`** và cộng thêm một xung nhọn `+0.80`:
-* Giá trị tại `(t=3, D1)` nhảy vọt từ `0.20` lên: `0.20 + 0.80 = 1.00`.
+Hàm `_inject_spike` trong `RedLamp/loaders/loader_aug.py` chọn ngẫu nhiên thời điểm **`t = 2` (ô thứ 3)** trên kênh **`D1`** và cộng thêm một xung nhọn `+0.80`:
+* Giá trị tại `(t=2, D1)` nhảy vọt từ `0.20` lên: `0.20 + 0.80 = 1.00` (khớp với dãy `[0.20, 0.20, 1.00, 0.20, ...]`).
 * Đồng thời sinh ra **2 thông tin giám sát đi kèm**:
-  1. **Mặt nạ `anomaly_mask` (`100 × 38`):** Trong code PyTorch (`loader_aug.py`, dòng 157 & 169), các ô bình thường mang giá trị **`1`**, riêng ô bị chèn lỗi `(t=3, D1)` mang giá trị **`0`**.
+  1. **Mặt nạ `anomaly_mask` (`100 × 38`):** Trong code PyTorch (`loader_aug.py`, dòng 157 & 169), các ô bình thường mang giá trị **`1`**, riêng ô bị chèn lỗi `(t=2, D1)` mang giá trị **`0`**.
      *(Ghi chú đọc bài báo: Phương trình (2) trong bài báo ký hiệu ngược lại $W = 1$ tại điểm lỗi rồi nhân với $(1 - W) = 0$; cả hai cách viết đều cho kết quả toán học giống hệt nhau là nhân `0` tại điểm chèn lỗi).*
   2. **Nhãn One-Hot `y` (`12` phần tử):** Lớp `0` là `Normal`, lớp `1` là `Spike` $\rightarrow$ `y = [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]`.
 
-| Thời gian `t` | `t=0` | `t=1` | `t=2` | **`t=3` (Chèn Spike)** | `t=4` | `t=5` | ... `t=99` |
+| Thời gian `t` | `t=0` | `t=1` | **`t=2` (Chèn Spike)** | `t=3` | `t=4` | `t=5` | ... `t=99` |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Đầu vào `X` (`D1`)** | `0.20` | `0.20` | `0.20` | **`1.00`** | `0.20` | `0.20` | `0.20` |
-| **`anomaly_mask` (`D1`)** | `1` | `1` | `1` | **`0`** | `1` | `1` | `1` |
+| **Đầu vào `X` (`D1`)** | `0.20` | `0.20` | **`1.00`** | `0.20` | `0.20` | `0.20` | `0.20` |
+| **`anomaly_mask` (`D1`)** | `1` | `1` | **`0`** | `1` | `1` | `1` | `1` |
 
 ---
 
@@ -254,26 +298,30 @@ $$L_{\text{out}} = \left\lfloor \frac{L_{\text{in}} + 2 \times \text{padding} - 
 * **Tầng 4 (`256 → 256` bộ lọc):** $\lfloor 14 / 2 \rfloor + 1 = \mathbf{8}$ $\rightarrow$ xuất bảng `[256 × 8]`
 
 #### 3.2. Nhẩm tay phép nhân – cộng của 1 bộ lọc (ví dụ Bộ lọc #1 chuyên dò gai nhọn)
-Giả sử Bộ lọc #1 trên kênh `D1` có 4 trọng số `[-1, -1, +3, -1]` (nếu gặp vùng phẳng 4 số bằng nhau thì tổng bằng `0`; nếu điểm thứ 3 vọt cao thì tổng dương rất lớn; giả sử trọng số trên `D2..D38` bằng `0` để nhẩm gọn):
+Giả sử Bộ lọc #1 trên kênh `D1` có 4 trọng số `[-1, -1, +3, -1]` (nếu gặp vùng phẳng 4 số bằng nhau thì tổng bằng `0`; nếu điểm thứ 3 vọt cao thì tổng dương rất lớn; giả sử trọng số trên `D2..D38` bằng `0` để nhẩm gọn).
 
-* **Vị trí trượt 1** *(nhìn 4 ô gồm 2 số `0` đệm đầu + `t=0, 1`: `[0, 0, 0.20, 0.20]`)*:
-  `(0)×(-1) + (0)×(-1) + (0.20)×(+3) + (0.20)×(-1) = +0.40`
-* **Vị trí trượt 2** *(nhảy `stride = 2` bước sang `[0.20, 0.20, 0.20, 1.00]`)*:
-  `(0.20)×(-1) + (0.20)×(-1) + (0.20)×(+3) + (1.00)×(-1) = -0.80`
-* **Vị trí trượt 3** *(khi thước lọc chụp trúng gai nhọn ở vị trí `+3`, ví dụ `[0.20, 0.20, 1.00, 0.20]`)*:
+Trước khi trượt, do **`padding = 2`**, PyTorch tự động **đệm thêm 2 số `0` vào đầu chuỗi `X`**:
+* Chuỗi sau khi đệm: `X_đệm = [ 0,  0,  0.20(t=0),  0.20(t=1),  1.00(t=2),  0.20(t=3),  0.20(t=4),  0.20(t=5), ... ]`
+
+Bây giờ đặt thước lọc `[-1, -1, +3, -1]` lên đầu `X_đệm`, mỗi nhịp nhảy **`stride = 2` ô**:
+* **Nhịp trượt 1** *(nhìn 4 ô đầu của `X_đệm` gồm **2 số `0` đệm đầu** + `t=0, 1`: `[0, 0, 0.20, 0.20]`)*:
+  `(0)×(-1) + (0)×(-1) + (0.20)×(+3) + (0.20)×(-1) = 0 + 0 + 0.60 - 0.20 = +0.40` *(chính 2 số `0` đệm đầu tạo ra `+0.40`!)*
+* **Nhịp trượt 2** *(nhảy `stride = 2` ô sang `t=0..3`: `[0.20, 0.20, 1.00, 0.20]` — chụp trúng gai `1.00` ở khe `+3`!)*:
   `(0.20)×(-1) + (0.20)×(-1) + (1.00)×(+3) + (0.20)×(-1) = -0.20 - 0.20 + 3.00 - 0.20 = +2.40` *(Phát hiện gai, giá trị vọt mạnh!)*
-* **Vị trí trượt 4 & 5** *(trượt qua vùng phẳng `[0.20, 0.20, 0.20, 0.20]`)*:
+* **Nhịp trượt 3** *(nhảy `stride = 2` ô sang `t=2..5`: `[1.00, 0.20, 0.20, 0.20]` — gai lùi ra khe `-1` rìa trái)*:
+  `(1.00)×(-1) + (0.20)×(-1) + (0.20)×(+3) + (0.20)×(-1) = -1.00 - 0.20 + 0.60 - 0.20 = -0.80`
+* **Nhịp trượt 4 & 5** *(nhảy tiếp qua vùng phẳng `[0.20, 0.20, 0.20, 0.20]`)*:
   `(0.20)×(-1) + (0.20)×(-1) + (0.20)×(+3) + (0.20)×(-1) = 0.00`
 
-Xét 5 giá trị đầu tiên của Bộ lọc #1: **`[+0.40, -0.80, +2.40, 0.00, 0.00]`**. Tiếp tục đi qua 3 phép biến đổi còn lại trong khối `ConvBlock`:
+Xét 5 giá trị đầu tiên của Bộ lọc #1: **`[+0.40, +2.40, -0.80, 0.00, 0.00]`**. Tiếp tục đi qua 3 phép biến đổi còn lại trong khối `ConvBlock`:
 1. **`BatchNorm1d` (Chuẩn hóa biên độ):**
-   * Trung bình $\mu = (0.40 - 0.80 + 2.40 + 0 + 0) / 5 = 0.40$; giả sử độ lệch chuẩn $\sigma = 1.00$.
-   * Tính $(x - \mu) / \sigma$: **`[0.00, -1.20, +2.00, -0.40, -0.40]`**.
+   * Trung bình $\mu = (0.40 + 2.40 - 0.80 + 0 + 0) / 5 = 0.40$; giả sử độ lệch chuẩn $\sigma = 1.00$.
+   * Tính $(x - \mu) / \sigma$: **`[0.00, +2.00, -1.20, -0.40, -0.40]`**.
 2. **`ReLU` (Giữ số dương, xóa số âm về `0`):**
-   * Áp dụng $\max(0, x)$: **`[0.00, 0.00, +2.00, 0.00, 0.00]`** *(Mọi nhiễu âm bị dập tắt, chỉ còn điểm gai `+2.00` nổi bật)*.
+   * Áp dụng $\max(0, x)$: **`[0.00, +2.00, 0.00, 0.00, 0.00]`** *(Mọi nhiễu âm bị dập tắt, chỉ còn điểm gai `+2.00` nổi bật)*.
 3. **`Dropout = 0.2` (Chỉ hoạt động lúc `Train`):**
    * Mỗi vị trí có `20%` xác suất bị tắt về `0`; các vị trí còn lại được nhân bù `1 / (1 - 0.2) = 1.25`.
-   * Giả sử vị trí `+2.00` không bị tắt: `2.00 × 1.25 = +2.50` $\rightarrow$ **`[0.00, 0.00, +2.50, 0.00, 0.00]`**.
+   * Giả sử vị trí `+2.00` không bị tắt: `2.00 × 1.25 = +2.50` $\rightarrow$ **`[0.00, +2.50, 0.00, 0.00, 0.00]`**.
 
 Đi hết Tầng 4, toàn bộ cửa sổ được cô đọng thành ma trận **`[256 kênh × 8 mốc thời gian]`**.
 
@@ -294,17 +342,17 @@ Từ cùng một **`Vector Embedding` (`128` chiều)**, mô hình rẽ làm **2
 
 #### 5.1. Nhánh 1 — `ConvDecoder` & Reconstruction Loss có `Anomaly Mask` (`loss_ae` / $\mathcal{L}_{MSE}$)
 `ConvDecoder` dùng tầng `Linear(1 → 8)` rồi 4 khối `Transposed Convolution` (`ConvTranspose1d`: `8 → 14 → 26 → 51 → 100`) để khôi phục `128` số về lại bảng dự đoán `X_hat` kích thước **`100 × 38`**.
-Vì `Bottleneck` chỉ lưu giữ quy luật bình thường, mạng tái tạo kênh `D1` mượt quanh `0.20–0.22` (kể cả ngay tại `t=3`):
+Vì `Bottleneck` chỉ lưu giữ quy luật bình thường, mạng tái tạo kênh `D1` mượt quanh `0.20–0.22` (kể cả ngay tại `t=2`):
 
-| Thời gian `t` | `t=0` | `t=1` | `t=2` | **`t=3` (Vị trí chèn Spike)** | `t=4` |
+| Thời gian `t` | `t=0` | `t=1` | **`t=2` (Vị trí chèn Spike)** | `t=3` | `t=4` |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Đầu vào `X`** | `0.20` | `0.20` | `0.20` | **`1.00`** | `0.20` |
-| **`Reconstruction` `X_hat`** | `0.21` | `0.20` | `0.21` | **`0.22`** | `0.20` |
-| **`anomaly_mask`** | `1` | `1` | `1` | **`0`** | `1` |
+| **Đầu vào `X`** | `0.20` | `0.20` | **`1.00`** | `0.20` | `0.20` |
+| **`Reconstruction` `X_hat`** | `0.21` | `0.20` | **`0.22`** | `0.21` | `0.20` |
+| **`anomaly_mask`** | `1` | `1` | **`0`** | `1` | `1` |
 
 Khi tính `loss_ae` lúc **Train**, code nhân `X * anomaly_mask` và `X_hat * anomaly_mask` trước khi tính bình phương sai số:
 * Tại `t=0` (ô bình thường, `mask = 1`): $(0.20 \times 1 - 0.21 \times 1)^2 = (-0.01)^2 = \mathbf{0.0001}$.
-* Tại **`t=3` (ô `Pseudo-Anomaly`, `mask = 0`)**: $(1.00 \times 0 - 0.22 \times 0)^2 = (0 - 0)^2 = \mathbf{0}$!
+* Tại **`t=2` (ô `Pseudo-Anomaly`, `mask = 0`)**: $(1.00 \times 0 - 0.22 \times 0)^2 = (0 - 0)^2 = \mathbf{0}$!
 * **Ý nghĩa quyết định:** Nhờ `mask = 0`, mô hình **không bị phạt** khi dự đoán `0.22` thay vì `1.00`. Nhờ đó `Decoder` không bao giờ `Overfit` vào gai lỗi mà chỉ trung thành tái tạo hình thái bình thường. Giả sử trung bình toàn cửa sổ `loss_ae = 0.0002`.
 
 #### 5.2. Nhánh 2 — `NonLinClassifier`, `Backward Correction` (`Soft Label`) & `loss_c` ($\mathcal{L}_{CE}$)
@@ -317,11 +365,11 @@ Vector `128` số đi qua mạng phân loại 2 tầng (`RedLamp/models/classifi
   * Lớp `0` (`Normal`): $0.01 + 0.1 = \mathbf{0.11}$ *(cộng xác suất $\alpha = 0.1$ về lớp bình thường)*
   * 10 lớp lỗi giả còn lại: mỗi lớp $\mathbf{0.01}$
   *(Kiểm tra tổng xác suất: $0.79 + 0.11 + 10 \times 0.01 = \mathbf{1.00}$)*.
-* Đối chiếu `y_hat` với `y_tilde` qua hàm Cross-Entropy thu được `loss_c` (ví dụ `1.65`), sau đó cộng trọng số với `loss_ae` theo hệ số $\gamma = \text{c\_loss\_ratio}$:
+* Đối chiếu `y_hat` với `y_tilde` qua hàm Cross-Entropy $-\sum \tilde{y}_i \ln(\hat{y}_i) = -(0.11\ln 0.10 + 0.79\ln 0.80 + 10 \times 0.01\ln 0.01) = 0.25 + 0.18 + 0.46 = \mathbf{0.89}$ (`loss_c`), sau đó cộng trọng số với `loss_ae` theo hệ số $\gamma = \text{c\_loss\_ratio}$:
 
 $$\mathcal{L} = (1 - \gamma)\mathcal{L}_{MSE} + \gamma\mathcal{L}_{CE}$$
 
-*(Với giá trị chuẩn Table 4 bài báo `c_loss_ratio = 0.10`: $\mathcal{L} = 0.9 \times 0.0002 + 0.1 \times 1.65 = \mathbf{0.16518}$).* Thuật toán tối ưu `AdamW` lan truyền ngược từ $\mathcal{L}$ để tinh chỉnh lại các bộ lọc, rồi trượt sang cửa sổ tiếp theo (`Step = 10`, tức `t = 10..109`).
+*(Với giá trị chuẩn Table 4 bài báo `c_loss_ratio = 0.10`: $\mathcal{L} = 0.9 \times 0.0002 + 0.1 \times 0.89 = \mathbf{0.08918}$).* Thuật toán tối ưu `AdamW` lan truyền ngược từ $\mathcal{L}$ để tinh chỉnh lại các bộ lọc, rồi trượt sang cửa sổ tiếp theo (`Step = 10`, tức `t = 10..109`).
 
 ---
 
@@ -331,7 +379,7 @@ Khi đưa một cửa sổ thực tế cần kiểm tra vào mô hình đã nạ
 1. **Không chèn lỗi giả, không có mặt nạ `W`, tắt hoàn toàn `Dropout`.**
 2. **Điểm sai số tái tạo $s_{MSE}(t)$ — Phương trình (5):** Tính trực tiếp độ lệch giữa tín hiệu thực `X` và bản vẽ lại `X_hat`:
    * Tại điểm bình thường (`t=0`): $(0.20 - 0.21)^2 = \mathbf{0.0001}$ *(sai số cực thấp)*.
-   * Tại điểm xảy ra sự cố thật (`t=3`): $(1.00 - 0.22)^2 = \mathbf{0.6084}$ *(sai số **vọt gấp hơn 6,000 lần** điểm bình thường!)*.
+   * Tại điểm xảy ra sự cố thật (`t=2`): $(1.00 - 0.22)^2 = \mathbf{0.6084}$ *(sai số **vọt gấp hơn 6,000 lần** điểm bình thường!)*.
 3. **Điểm phân loại hiệu chỉnh $s_{CE}(t)$ — Phương trình (6)–(7):** Cộng xác suất của 11 lớp bất thường ($i = 2..12$), nhưng nếu lớp giả bất thường nào xuất hiện tràn lan trên toàn chuỗi kiểm thử vượt ngưỡng $\delta = 0.05$ (*lớp giả bình thường — Pseudo-normal class*), bộ lọc **`FAA` (Frequent Anomaly Adjustment)** tự động gán điểm lớp đó về `0` để triệt tiêu báo động giả.
 4. **Làm mượt `MA = 50` & Tổng hợp điểm bất thường cuối cùng $s(t)$ — Phương trình (8):** Trong `RedLamp/main.py` (`convolve_minmax_score`, dòng 258–303), cả hai dãy $s_{MSE}(t)$ và $s_{CE}(t)$ đều được làm mượt bằng trung bình trượt $w = W/2 = 50$ bước, chuẩn hóa Min-Max về $[0, 1]$ trên chuỗi kiểm thử rồi lấy trung bình cộng `50% - 50%` lưu thành tệp `anomaly_score.npy`:
 
@@ -365,14 +413,14 @@ Hai cách chấm điểm cũ đều gây sai lệch nghiêm trọng:
 
 ---
 
-### 4.3. Sơ đồ tiến hóa của các thước đo trong `RedLamp/evaluate.py`
+### 4.3. Sơ đồ tiến hóa & Ví dụ đối chiếu trực tiếp 3 thước đo trên cùng 1 chuỗi 10 giây
 
 ```mermaid
 flowchart LR
     S["Điểm liên tục s(t) ∈ [0, 1]<br/>+ Nhãn thật Y(t) ∈ {0, 1}"] --> C1["Cắt 1 ngưỡng cố định<br/>τ = mean(s) + 3·std(s)"]
     S --> C2["Quét mọi ngưỡng cắt τ ∈ [0, 1]<br/>(250 mức - Không phụ thuộc ngưỡng)"]
 
-    C1 --> RF["1. RF (Range F-score)<br/>Chấm điểm theo đoạn lỗi,<br/>phạt nếu phát hiện bị băm vụn"]
+    C1 --> RF["1. RF (Range F-score)<br/>Chấm độ phủ & độ liền mạch đoạn lỗi,<br/>phạt 1/k nếu phát hiện bị đứt khúc"]
 
     C2 --> BUF1["Mở vùng đệm mềm cố định<br/>b = W/2 = 50 bước mỗi bên"]
     BUF1 --> RAUC["2 & 3. Range-AUC-ROC / PR<br/>Diện tích dưới đường cong 2D<br/>(Table 5 bài báo)"]
@@ -380,6 +428,25 @@ flowchart LR
     C2 --> BUF2["Quét độ dài vùng đệm liên tục<br/>ℓ = 0 → 100 (b = 0 → 50)"]
     BUF2 --> VUS["4 & 5. VUS-ROC / VUS-PR<br/>Thể tích dưới mặt cong 3D<br/>(Thước đo chính Table 3 & Demo)"]
 ```
+
+Hãy theo dõi **cùng một chuỗi kiểm thử 10 giây (`t = 0..9`)** dưới đây đi qua cả 3 nhánh trên sơ đồ để thấy rõ mỗi thông số kiểm tra khía cạnh nào:
+
+```text
+Giây t:               t=0    t=1   t=2(nhầm!)  t=3     t=4    t=5    t=6    t=7     t=8    t=9
+Nhãn thật   Y(t):   [  0 ,    0 ,    0      ,   0 ,     1 ,    1 ,    1 ,    1 ,     0 ,    0 ]
+                                                       └──── Sự cố thật [4..7] ────┘
+Điểm mô hình s(t):  [0.05,  0.06,  0.52     , 0.55,   0.88,  0.92,  0.30,  0.85,   0.10,  0.04]
+                                     ▲          ▲                    ▲
+                             Báo giả xa lỗi   Báo sớm          Tụt hụt ở giữa!
+                                              sát mép          (gây đứt khúc nếu cắt τ=0.50)
+```
+
+1. **Nhánh `VUS-ROC` (Góc nhìn phân tách tổng thể toàn chuỗi — quét mọi $\tau$ & vùng đệm $\ell$):**
+   * Xét trên toàn bộ 10 giây: đa số giây lỗi (`0.88, 0.92, 0.85`) đều cao vượt trội so với nền bình thường (`0.05, 0.06, 0.10, 0.04`); riêng `t=3 (0.55)` nằm sát mép sự cố nên được **vùng đệm mềm** ghi nhận một phần đúng. Nhờ mẫu bình thường chiếm đa số đứng ở mẫu số `FPR = FP / (FP + TN)`, `VUS-ROC` cho điểm tổng quan rất cao.
+2. **Nhánh `VUS-PR` (Góc nhìn dữ liệu hiếm lỗi — phạt nặng điểm báo nhầm xa sự cố):**
+   * Bỏ qua các điểm nền bình thường thấp (`t=0, 1, 8, 9`), **chỉ gom các điểm vượt ngưỡng báo lỗi** để tính `Precision = TP / (TP + FP)`. Khi hạ ngưỡng xuống `τ = 0.50` để bắt lỗi, điểm báo giả `t=2 (0.52)` (nằm xa sự cố, ngoài vùng đệm) lập tức làm giảm tỷ lệ chính xác trong nhóm báo lỗi $\rightarrow$ trên chuỗi thực tế hiếm lỗi (`1%–4%`), chỉ vài chục điểm như `t=2` sẽ kéo `VUS-PR` xuống mạnh, giúp phân hạng khắt khe mô hình nào ít báo giả nhất.
+3. **Nhánh `RF` (Góc nhìn thực thi sau khi cắt 1 ngưỡng cố định — đo độ phủ & độ liền mạch đoạn lỗi):**
+   * Giả sử ngưỡng tự động cắt tại `τ = 0.50`, dãy điểm `s(t)` biến thành dãy nhị phân $\hat{Y} = [0, 0, 1, 1, \mathbf{1, 1, 0, 1}, 0, 0]$: ngay giữa đoạn sự cố thật `[4..7]`, điểm `t=6 (0.30)` tụt xuống dưới ngưỡng làm cảnh báo bị **đứt làm 2 mảnh rời rạc** (`[2..5]` và `[7]`) $\rightarrow$ `RF` lập tức **chia phạt `1/2` điểm bắt lỗi** vì thiếu tính liền mạch!
 
 ---
 
@@ -402,18 +469,34 @@ $$R_T(R_i, \hat{R}) = \Big[\underbrace{\alpha \cdot \mathbb{I}(|R_i \cap \hat{R}
 
    * **Thưởng tồn tại ($\alpha = 0.2$):** Hễ phát hiện chạm trúng đoạn sự cố là được thưởng trước `20%` điểm (vì đã kịp báo động cho kỹ sư).
    * **Thưởng độ phủ ($1 - \alpha = 0.8$):** `80%` điểm còn lại tính sòng phẳng theo tỷ lệ số giây bắt trúng trên tổng độ dài sự cố (chặn đứng trò gian lận của `F1-PA`!).
-   * **Hệ số phạt băm vụn (*Cardinality factor* $\gamma$):** Nếu 1 sự cố liền mạch bị mô hình báo ngắt quãng thành $k > 1$ mảnh rời rạc, điểm bị chia phạt $\gamma = 1 / k$.
+   * **Hệ số phạt băm vụn / đứt khúc (*Cardinality factor* $\gamma$):** Nếu 1 sự cố liền mạch bị mô hình báo ngắt quãng thành $k > 1$ mảnh rời rạc, điểm bị chia phạt $\gamma = 1 / k$.
 2. **`Range Precision` của một đoạn dự đoán $\hat{R}_j$:** Đo tỷ lệ phần trăm các bước trong đoạn báo động $\hat{R}_j$ thực sự nằm trùng trong lỗi thật: $P_T(\hat{R}_j, R) = |\hat{R}_j \cap R| / |\hat{R}_j|$.
 3. **Tổng hợp `RF`:** Lấy trung bình $R_T$ trên mọi đoạn lỗi thật, trung bình $P_T$ trên mọi đoạn báo động, rồi tính trung bình điều hòa:
 
 $$\text{RF} = \frac{2 \times P_T \times R_T}{P_T + R_T}$$
 
-#### 🧮 Ví dụ tính nhẩm `RF` trong 15 giây
-Giả sử chuỗi 10 giây có **1 đoạn lỗi thật** $R_1 = [4, 7]$ (dài `4` giây: `t = 4, 5, 6, 7`), và sau khi cắt ngưỡng $\tau_{3\sigma}$, mô hình báo **1 đoạn lỗi liền mạch** $\hat{R}_1 = [3, 5]$ (dài `3` giây: `t = 3, 4, 5` — tức báo sớm 1 giây ở `t=3` và bắt trúng 2 giây `t=4, 5`):
-* Phần giao nhau $|R_1 \cap \hat{R}_1| = |\{4, 5\}| = \mathbf{2}$ giây; chỉ có $k = 1$ đoạn dự đoán chồng lên $R_1$ nên không bị phạt băm vụn ($\gamma = 1$).
-* **`Range Recall`:** $R_T = \big[0.2 \times 1 + 0.8 \times \frac{2}{4}\big] \times 1 = 0.2 + 0.4 = \mathbf{0.600}$ (`60%`).
-* **`Range Precision`:** Trong 3 giây mô hình hú còi (`t = 3, 4, 5`), có 2 giây đúng sự cố thật $\implies P_T = \frac{2}{3} \approx \mathbf{0.667}$ (`66.7%`).
-* **Điểm `RF`:** $\text{RF} = \frac{2 \times 0.667 \times 0.600}{0.667 + 0.600} = \frac{0.800}{1.267} \approx \mathbf{0.632}$.
+#### 🧮 Ví dụ tính nhẩm `RF`: Đối chiếu "Dự đoán liền mạch (`k = 1`)" vs. "Dự đoán đứt khúc (`k = 2`)"
+Giả sử chuỗi 10 giây (`t = 0..9`) có **1 đoạn lỗi thật** $R_1 = [4, 7]$ (dài `4` giây: `t = 4, 5, 6, 7`). Ta so sánh 2 mô hình **cùng báo tổng cộng 3 giây** và **cùng bắt trúng đúng 2/4 giây lỗi thật**, chỉ khác nhau ở **độ liền mạch**:
+
+* **Trường hợp A — Mô hình báo LIỀN MẠCH 1 đoạn $\hat{R}_1 = [3, 5]$ (`t = 3, 4, 5` $\implies k = 1$ mảnh):**
+  ```text
+  Nhãn thật Y:      [0, 0, 0, 0,  1, 1, 1, 1,  0, 0]   (1 sự cố liền mạch t=4..7)
+  Dự đoán liền (A): [0, 0, 0, 1,  1, 1, 0, 0,  0, 0]   ──► 1 đoạn liên tục [3..5] (k = 1 -> γ = 1)
+  ```
+  * Giao nhau $|R_1 \cap \hat{R}_1| = |\{4, 5\}| = \mathbf{2}$ giây; chỉ có $k = 1$ đoạn chồng lên $R_1 \implies$ không bị phạt ($\gamma = 1$).
+  * **`Range Recall`:** $R_T = \big[0.2 \times 1 + 0.8 \times \frac{2}{4}\big] \times 1 = 0.2 + 0.4 = \mathbf{0.600}$ (`60%`).
+  * **`Range Precision`:** Trong 3 giây báo lỗi (`t = 3, 4, 5`), có 2 giây đúng sự cố thật $\implies P_T = \frac{2}{3} \approx \mathbf{0.667}$ (`66.7%`).
+  * **Điểm `RF` (Liền mạch):** $\text{RF} = \frac{2 \times 0.667 \times 0.600}{0.667 + 0.600} = \mathbf{0.632}$.
+
+* **Trường hợp B — Mô hình báo ĐỨT KHÚC thành 2 mảnh $\hat{R}_1 = [3, 4]$ và $\hat{R}_2 = [7]$ (`t = 3, 4` rồi tắt, tới `t = 7` bật lại $\implies k = 2$ mảnh):**
+  ```text
+  Nhãn thật Y:      [0, 0, 0, 0,  1, 1, 1, 1,  0, 0]   (1 sự cố liền mạch t=4..7)
+  Dự đoán vụn (B):  [0, 0, 0, 1,  1, 0, 0, 1,  0, 0]   ──► Tách làm 2 mảnh [3..4] & [7] (k = 2 -> γ = 1/2!)
+  ```
+  * Vẫn bắt trúng tổng cộng `2/4` giây lỗi (`t = 4` và `t = 7`), nhưng do **1 sự cố bị băm thành $k = 2$ mảnh rời rạc**, hệ số phạt là $\gamma = \frac{1}{2} = \mathbf{0.5}$:
+  * **`Range Recall` (bị chia đôi!):** $R_T = \big[0.2 \times 1 + 0.8 \times \frac{2}{4}\big] \times \frac{1}{2} = 0.600 \times 0.5 = \mathbf{0.300}$ (`30%`).
+  * **`Range Precision`:** Trung bình 2 mảnh báo lỗi: mảnh `[3, 4]` đúng `1/2 = 0.50`, mảnh `[7]` đúng `1/1 = 1.00` $\implies P_T = \frac{0.50 + 1.00}{2} = \mathbf{0.750}$.
+  * **Điểm `RF` (Đứt khúc):** $\text{RF} = \frac{2 \times 0.750 \times 0.300}{0.750 + 0.300} = \mathbf{0.429}$ *(thấp hơn hẳn **`0.632`** của Mô hình A chỉ vì dự đoán thiếu tính liền mạch!).*
 
 ---
 
